@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 180" role="img" aria-label="Noctra logo">
+  <rect width="700" height="180" fill="none"/>
+  <g transform="translate(18 10)">
+    <text x="0" y="124" font-family="Arial Rounded MT Bold, Arial Black, Arial, sans-serif" font-size="142" font-weight="900" letter-spacing="-12" fill="#050505" stroke="#050505" stroke-width="3" stroke-linejoin="round">noctra</text>
+    <path d="M649 37l7 14 15 2-11 11 3 15-14-7-14 7 3-15-11-11 15-2z" fill="#ff4f2d"/>
+  </g>
+</svg>
