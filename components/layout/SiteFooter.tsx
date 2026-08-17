@@ -58,7 +58,13 @@ export function SiteFooter() {
             </ul>
           </div>
           <div className="footer-brand">
-            <Image src="/assets/logo.svg" alt="NOCTRA" width={700} height={180} />
+              <Image
+                src="/assets/logo.svg"
+                alt="NOCTRA"
+                width={700}
+                height={180}
+                style={{ height: "auto" }}
+              />
             <p>
               An original placeholder streetwear brand used to demonstrate the
               reference store&apos;s UX pattern without copying its identity or
