@@ -8,6 +8,8 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
+    "catalog:check": "node scripts/check-catalog.mjs",
+    "catalog:sync": "node scripts/sync-catalog.mjs",
     "test:unit": "playwright test --config=playwright.unit.config.ts",
     "test:e2e": "playwright test tests/e2e",
     "test:visual": "playwright test tests/visual",

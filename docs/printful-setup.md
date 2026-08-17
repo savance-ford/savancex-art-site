@@ -95,6 +95,18 @@ Invoke-RestMethod `
   -Headers $headers
 ```
 
+With the application running locally, the repository command provides the same
+operation without embedding the secret in the command:
+
+```bash
+npm run catalog:sync
+```
+
+The command reads `CATALOG_SYNC_SECRET` from `.env.local` when supported by the
+installed Node.js version, or from the existing shell environment. Set
+`CATALOG_ADMIN_BASE_URL` when the application is not running at
+`http://localhost:3000`.
+
 Only one run can have `status = 'running'`. A concurrent request returns HTTP
 `409`. Running syncs have a one-hour database lease so a process crash cannot
 block synchronization permanently. A run that exceeds the lease cannot apply
@@ -129,3 +141,5 @@ Printful remains a server-to-server integration. This phase does not write to
 the storefront's read path, does not change `CatalogProvider`, and leaves
 `LocalCatalogProvider` as the active storefront catalog. Synchronization writes
 only the Supabase commerce tables for later verification and activation.
+
+See `docs/catalog-diagnostics.md` for the protected database-catalog checks.
