@@ -1,5 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
+import { NewsletterSection } from "@/components/layout/NewsletterSection";
+import { SiteFooter } from "@/components/layout/SiteFooter";
+import { SiteHeader } from "@/components/layout/SiteHeader";
+import { UtilityBar } from "@/components/layout/UtilityBar";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -23,7 +27,17 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
         <a className="skip-link" href="#main">
           Skip to content
         </a>
+        <UtilityBar />
+        <SiteHeader />
         {children}
+        <NewsletterSection />
+        <SiteFooter />
+        <div id="overlay-root" />
+        <div id="toast-root" aria-live="polite" />
+        <noscript>
+          This prototype requires JavaScript for navigation and cart
+          interactions.
+        </noscript>
       </body>
     </html>
   );
