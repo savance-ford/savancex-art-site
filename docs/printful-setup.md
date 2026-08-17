@@ -1,8 +1,8 @@
 # Printful API setup
 
-This phase adds a server-only connection to Printful's stable REST API. It does
-not synchronize products to Supabase and does not replace the local storefront
-catalog.
+This integration connects to Printful's stable REST API entirely on the server
+and can synchronize its product catalog into Supabase. It does not replace the
+local storefront catalog or change the storefront's current read path.
 
 ## 1. Create a Printful store
 
@@ -70,8 +70,62 @@ request returns only the connection status, selected store ID/name, and total
 sync-product count. Printful credentials, request headers, and raw provider
 payloads are never returned.
 
-## 5. Current storefront status
+## 5. Trigger a manual catalog sync
+
+Apply both Supabase migrations before using the synchronization endpoint. The
+second migration adds the database-backed synchronization lock and the
+transactional catalog-application function.
+
+Trigger a sync with `POST` and the same catalog sync secret:
+
+```bash
+curl --fail-with-body \
+  --request POST \
+  --header "Authorization: Bearer $CATALOG_SYNC_SECRET" \
+  http://localhost:3000/api/admin/printful/sync
+```
+
+PowerShell equivalent:
+
+```powershell
+$headers = @{ Authorization = "Bearer $env:CATALOG_SYNC_SECRET" }
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://localhost:3000/api/admin/printful/sync" `
+  -Headers $headers
+```
+
+Only one run can have `status = 'running'`. A concurrent request returns HTTP
+`409`. Running syncs have a one-hour database lease so a process crash cannot
+block synchronization permanently. A run that exceeds the lease cannot apply
+its catalog after a replacement run begins.
+
+## 6. Inspect synchronization runs
+
+Open **Table Editor → printful_sync_runs** in Supabase to inspect start and
+completion times, status, received/upserted counts, and safe error messages.
+The same information can be queried in the SQL Editor:
+
+```sql
+select
+  id,
+  started_at,
+  completed_at,
+  status,
+  products_received,
+  products_upserted,
+  variants_received,
+  variants_upserted,
+  error_message
+from public.printful_sync_runs
+order by started_at desc;
+```
+
+Tokens and authorization headers are never written to synchronization rows.
+
+## 7. Current storefront status
 
 Printful remains a server-to-server integration. This phase does not write to
-Supabase, does not change `CatalogProvider`, and leaves `LocalCatalogProvider`
-as the active storefront catalog.
+the storefront's read path, does not change `CatalogProvider`, and leaves
+`LocalCatalogProvider` as the active storefront catalog. Synchronization writes
+only the Supabase commerce tables for later verification and activation.

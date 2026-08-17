@@ -197,6 +197,19 @@ export type Database = {
       };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      begin_printful_catalog_sync: {
+        Args: Record<string, never>;
+        Returns: string;
+      };
+      apply_printful_catalog_sync: {
+        Args: {
+          p_sync_run_id: string;
+          p_products: Json;
+          p_variants: Json;
+        };
+        Returns: Json;
+      };
+    };
   };
 };

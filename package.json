@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
+    "test:unit": "playwright test --config=playwright.unit.config.ts",
     "test:e2e": "playwright test tests/e2e",
     "test:visual": "playwright test tests/visual",
     "check": "npm run lint && npm run typecheck && npm run build"
