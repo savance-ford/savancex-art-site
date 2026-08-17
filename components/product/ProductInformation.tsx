@@ -15,7 +15,7 @@ export function ProductInformation({ product }: ProductInformationProps) {
       <span className="eyebrow">
         {product.collection} / {product.category}
       </span>
-      <h1>{product.name}</h1>
+      <h1 className="product-title">{product.name}</h1>
       <ProductRating rating={product.rating} reviews={product.reviews} />
       <div className="product-price">
         <s>{formatMoney(product.compareAt)}</s>

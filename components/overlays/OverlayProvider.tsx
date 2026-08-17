@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -29,18 +30,39 @@ export function OverlayProvider({ children }: { readonly children: ReactNode }) 
   const [activeOverlay, setActiveOverlay] =
     useState<StorefrontOverlay | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const openerRef = useRef<HTMLElement | null>(null);
 
-  const closeOverlay = useCallback(() => setActiveOverlay(null), []);
-  const openCartDrawer = useCallback(() => setActiveOverlay("cart"), []);
-  const openMobileNavigation = useCallback(
-    () => setActiveOverlay("mobile"),
-    [],
-  );
-  const openFilterDrawer = useCallback(() => setActiveOverlay("filter"), []);
+  const rememberOpener = useCallback(() => {
+    openerRef.current =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+  }, []);
+
+  const closeOverlay = useCallback(() => {
+    setActiveOverlay(null);
+
+    const opener = openerRef.current;
+    openerRef.current = null;
+    if (opener) requestAnimationFrame(() => opener.focus());
+  }, []);
+  const openCartDrawer = useCallback(() => {
+    rememberOpener();
+    setActiveOverlay("cart");
+  }, [rememberOpener]);
+  const openMobileNavigation = useCallback(() => {
+    rememberOpener();
+    setActiveOverlay("mobile");
+  }, [rememberOpener]);
+  const openFilterDrawer = useCallback(() => {
+    rememberOpener();
+    setActiveOverlay("filter");
+  }, [rememberOpener]);
   const openSearchOverlay = useCallback(() => {
+    rememberOpener();
     setSearchQuery("");
     setActiveOverlay("search");
-  }, []);
+  }, [rememberOpener]);
 
   useEffect(() => {
     document.body.classList.toggle("is-locked", activeOverlay !== null);

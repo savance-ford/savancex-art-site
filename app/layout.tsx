@@ -9,17 +9,56 @@ import { ToastProvider } from "@/components/overlays/ToastProvider";
 import { SearchOverlay } from "@/components/search/SearchOverlay";
 import "./globals.css";
 
+const SITE_URL = "https://savancex.art";
+const SITE_TITLE = "SAVANCEX — Independent Streetwear";
+const SITE_DESCRIPTION =
+  "Shop SAVANCEX independent streetwear, including heavyweight graphic tees, hoodies, crewnecks, and limited collections.";
+
 export const metadata: Metadata = {
-  metadataBase: new URL(
-    process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
-  ),
+  metadataBase: new URL(SITE_URL),
   title: {
-    default: "NOCTRA — Streetwear Storefront Prototype",
-    template: "%s — NOCTRA",
+    default: SITE_TITLE,
+    template: "%s — SAVANCEX",
   },
-  description:
-    "NOCTRA — an original streetwear storefront prototype with editorial product discovery, collection pages, cart flow, search, support pages, and responsive interactions.",
-  icons: { icon: "/assets/favicon.svg" },
+  description: SITE_DESCRIPTION,
+  alternates: { canonical: "/" },
+  openGraph: {
+    type: "website",
+    url: "/",
+    siteName: "SAVANCEX",
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    images: [
+      {
+        url: "/assets/hero-main.jpg",
+        width: 4234,
+        height: 6508,
+        alt: "SAVANCEX storefront campaign",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    images: ["/assets/hero-main.jpg"],
+  },
+  icons: {
+    icon: [{ url: "/assets/favicon.svg", type: "image/svg+xml" }],
+    shortcut: "/assets/favicon.svg",
+  },
+  manifest: "/manifest.webmanifest",
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
+  },
 };
 
 export const viewport: Viewport = {

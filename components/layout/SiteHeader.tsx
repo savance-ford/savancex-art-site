@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useCart } from "@/components/cart/CartProvider";
 import { MainNavigation } from "@/components/layout/MainNavigation";
 import { MegaMenu } from "@/components/layout/MegaMenu";
@@ -11,6 +11,7 @@ import { BagIcon, MenuIcon, SearchIcon } from "@/components/ui/Icons";
 
 export function SiteHeader() {
   const [isMegaMenuOpen, setIsMegaMenuOpen] = useState(false);
+  const megaMenuTriggerRef = useRef<HTMLButtonElement>(null);
   const { cartCount, openCartDrawer } = useCart();
   const {
     openSearchOverlay,
@@ -25,12 +26,15 @@ export function SiteHeader() {
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") closeNavigation();
+      if (event.key !== "Escape" || !isMegaMenuOpen) return;
+
+      setIsMegaMenuOpen(false);
+      requestAnimationFrame(() => megaMenuTriggerRef.current?.focus());
     }
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [closeNavigation]);
+  }, [isMegaMenuOpen]);
 
   function toggleMegaMenu() {
     setIsMegaMenuOpen((isOpen) => !isOpen);
@@ -67,6 +71,7 @@ export function SiteHeader() {
           </button>
           <MainNavigation
             isMegaMenuOpen={isMegaMenuOpen}
+            triggerRef={megaMenuTriggerRef}
             onNavigate={closeNavigation}
             onToggleMegaMenu={toggleMegaMenu}
           />

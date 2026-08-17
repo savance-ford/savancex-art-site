@@ -934,7 +934,7 @@ body { font-family: Arial, Helvetica, sans-serif; font-size: 14px; line-height: 
 .product-gallery__item { background: #f8f8f6; }
 .product-gallery__item img { object-fit: contain; }
 .product-info { top: calc(var(--header-h) + 24px); }
-.product-title { font-family: Arial, Helvetica, sans-serif; font-size: clamp(30px,3.4vw,51px); line-height: 1; letter-spacing: -.045em; text-transform: none; }
+h1.product-title { font-family: "Arial Black", Impact, sans-serif; font-size: clamp(38px,4.6vw,72px); line-height: .94; letter-spacing: -.1em; text-transform: uppercase; transform: scaleX(.96); transform-origin: left top; }
 .product-price strong { color: #e3341d; }
 .add-to-cart { background: #050505; border-color: #050505; }
 .option-button.is-active { background: #050505; color: #fff; }
@@ -942,6 +942,7 @@ body { font-family: Arial, Helvetica, sans-serif; font-size: 14px; line-height: 
 
 /* Drawers and controls */
 .drawer, .search-overlay, .mobile-nav { background: #fff; }
+.drawer:not(.is-open) { box-shadow: none; }
 .drawer__head, .drawer__foot { background: #fff; }
 .toast { border-radius: 0; }
 
@@ -1011,7 +1012,7 @@ body { font-family: Arial, Helvetica, sans-serif; font-size: 14px; line-height: 
   .reference-proof__grid > div { min-height: 205px; padding: 28px 21px; border-right: 0 !important; border-bottom: 1px solid #050505; }
   .reference-proof__grid > div:last-child { border-bottom: 0; }
   .reference-story__image { min-height: 480px; }
-  .reference-story__copy { padding: 50px 20px 58px; }
+  .reference-story__copy { padding: 50px 20px 30px; }
   .reference-community__grid { gap: 4px; }
   .reference-community__card span { left: 9px; bottom: 8px; font-size: 8px; }
   .reference-newsletter__form { grid-template-columns: 1fr; }

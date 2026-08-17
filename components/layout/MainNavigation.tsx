@@ -1,14 +1,17 @@
 import Link from "next/link";
+import type { Ref } from "react";
 import { ChevronIcon } from "@/components/ui/Icons";
 
 interface MainNavigationProps {
   readonly isMegaMenuOpen: boolean;
+  readonly triggerRef: Ref<HTMLButtonElement>;
   readonly onNavigate: () => void;
   readonly onToggleMegaMenu: () => void;
 }
 
 export function MainNavigation({
   isMegaMenuOpen,
+  triggerRef,
   onNavigate,
   onToggleMegaMenu,
 }: MainNavigationProps) {
@@ -18,6 +21,7 @@ export function MainNavigation({
         Home
       </Link>
       <button
+        ref={triggerRef}
         type="button"
         className="nav-trigger"
         data-action="toggle-mega"

@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useStorefrontOverlay } from "@/components/overlays/OverlayProvider";
 import { usePortalRoot } from "@/components/overlays/usePortalRoot";
@@ -11,6 +12,16 @@ export function MobileNavigation() {
   const { activeOverlay, closeOverlay } = useStorefrontOverlay();
   const isOpen = activeOverlay === "mobile";
   const overlayRoot = usePortalRoot("overlay-root");
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const animationFrame = requestAnimationFrame(() =>
+      closeButtonRef.current?.focus(),
+    );
+    return () => cancelAnimationFrame(animationFrame);
+  }, [isOpen]);
 
   if (!overlayRoot) return null;
 
@@ -26,6 +37,7 @@ export function MobileNavigation() {
           <Image src="/assets/logo.svg" alt="NOCTRA" width={700} height={180} />
         </Link>
         <button
+          ref={closeButtonRef}
           type="button"
           className="icon-button"
           data-action="close-mobile"

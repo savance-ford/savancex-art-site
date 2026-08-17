@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { OverlayBackdrop } from "@/components/overlays/OverlayBackdrop";
 import { useStorefrontOverlay } from "@/components/overlays/OverlayProvider";
@@ -29,6 +30,16 @@ export function FilterDrawer({
   const { activeOverlay, closeOverlay } = useStorefrontOverlay();
   const overlayRoot = usePortalRoot("overlay-root");
   const isOpen = activeOverlay === "filter";
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const animationFrame = requestAnimationFrame(() =>
+      closeButtonRef.current?.focus(),
+    );
+    return () => cancelAnimationFrame(animationFrame);
+  }, [isOpen]);
 
   function updateCategory(category: ProductCategory, checked: boolean) {
     onChange({
@@ -53,6 +64,7 @@ export function FilterDrawer({
         <div className="drawer__head">
           <h2>Filter products</h2>
           <button
+            ref={closeButtonRef}
             type="button"
             className="icon-button"
             data-action="close-filter"

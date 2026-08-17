@@ -8,6 +8,8 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
+    "test:e2e": "playwright test tests/e2e",
+    "test:visual": "playwright test tests/visual",
     "check": "npm run lint && npm run typecheck && npm run build"
   },
   "dependencies": {
@@ -16,11 +18,15 @@
     "react-dom": "latest"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@types/node": "latest",
+    "@types/pngjs": "^6.0.5",
     "@types/react": "latest",
     "@types/react-dom": "latest",
     "eslint": "latest",
     "eslint-config-next": "16.3.1",
+    "pixelmatch": "^7.2.0",
+    "pngjs": "^7.0.0",
     "typescript": "latest"
   }
 }

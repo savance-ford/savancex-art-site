@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { CartLine } from "@/components/cart/CartLine";
 import { CartProgress } from "@/components/cart/CartProgress";
@@ -15,6 +16,16 @@ export function CartDrawer() {
   const { lines, cartCount, subtotal, isCartDrawerOpen } = useCart();
   const { closeOverlay } = useStorefrontOverlay();
   const overlayRoot = usePortalRoot("overlay-root");
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!isCartDrawerOpen) return;
+
+    const animationFrame = requestAnimationFrame(() =>
+      closeButtonRef.current?.focus(),
+    );
+    return () => cancelAnimationFrame(animationFrame);
+  }, [isCartDrawerOpen]);
 
   if (!overlayRoot) return null;
 
@@ -30,6 +41,7 @@ export function CartDrawer() {
         <div className="drawer__head">
           <h2>Your cart ({cartCount})</h2>
           <button
+            ref={closeButtonRef}
             type="button"
             className="icon-button"
             data-action="close-cart"

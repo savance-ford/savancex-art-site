@@ -9,6 +9,8 @@ export default defineConfig([
     ".next/**",
     "out/**",
     "build/**",
+    "playwright-report/**",
+    "test-results/**",
     "reference-static/**",
     "next-env.d.ts",
     "app.js",
