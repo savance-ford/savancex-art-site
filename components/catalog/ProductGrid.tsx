@@ -5,7 +5,7 @@ type ProductGridColumnCount = 3 | 4;
 
 interface ProductGridProps {
   readonly products: readonly Product[];
-  readonly columns: ProductGridColumnCount;
+  readonly columns?: ProductGridColumnCount;
 }
 
 const GRID_CLASS_BY_COLUMN_COUNT = {
@@ -14,10 +14,12 @@ const GRID_CLASS_BY_COLUMN_COUNT = {
 } as const satisfies Readonly<Record<ProductGridColumnCount, string>>;
 
 export function ProductGrid({ products, columns }: ProductGridProps) {
+  const className = columns
+    ? `reference-product-grid ${GRID_CLASS_BY_COLUMN_COUNT[columns]}`
+    : "product-grid";
+
   return (
-    <div
-      className={`reference-product-grid ${GRID_CLASS_BY_COLUMN_COUNT[columns]}`}
-    >
+    <div className={className}>
       {products.map((product) => (
         <ProductCard key={product.id} product={product} />
       ))}
