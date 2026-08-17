@@ -1,0 +1,105 @@
+"use client";
+
+import Link from "next/link";
+import { CartLine } from "@/components/cart/CartLine";
+import { CartProgress } from "@/components/cart/CartProgress";
+import { useCart } from "@/components/cart/CartProvider";
+import { ProductRail } from "@/components/catalog/ProductRail";
+import { AnnouncementMarquee } from "@/components/layout/AnnouncementMarquee";
+import { brand } from "@/data/products";
+import { getAllProducts } from "@/lib/commerce/catalog";
+import { formatMoney } from "@/lib/formatting/money";
+
+const POPULAR_PRODUCTS = getAllProducts().slice(0, 5);
+
+export function CartPageClient() {
+  const { lines, cartCount, subtotal } = useCart();
+
+  if (!lines.length) {
+    return (
+      <main id="main">
+        <AnnouncementMarquee />
+        <section className="cart-page">
+          <div className="container empty-state">
+            <div>
+              <span className="kicker">Cart (0)</span>
+              <h2>Your bag is empty.</h2>
+              <p>Start with the latest drop or browse the full catalog.</p>
+              <Link href="/shop" className="btn">
+                Continue shopping
+              </Link>
+            </div>
+          </div>
+        </section>
+        <section className="section section--dark">
+          <div className="container">
+            <div className="section-head">
+              <div>
+                <span className="kicker">Popular picks</span>
+                <h2 className="section-title">Start here.</h2>
+              </div>
+            </div>
+            <ProductRail products={POPULAR_PRODUCTS} />
+          </div>
+        </section>
+      </main>
+    );
+  }
+
+  return (
+    <main id="main">
+      <AnnouncementMarquee />
+      <section className="cart-page">
+        <div className="container">
+          <div className="section-head">
+            <h1 className="display">Your bag.</h1>
+            <span>
+              {cartCount} item{cartCount === 1 ? "" : "s"}
+            </span>
+          </div>
+          <div className="cart-page__layout">
+            <div className="cart-list">
+              {lines.map((line) => (
+                <CartLine
+                  key={`${line.productId}::${line.color}::${line.size}`}
+                  line={line}
+                />
+              ))}
+            </div>
+            <aside className="cart-summary">
+              <CartProgress subtotal={subtotal} />
+              <h2>Order summary</h2>
+              <div className="summary-row">
+                <span>Subtotal</span>
+                <strong>{formatMoney(subtotal)}</strong>
+              </div>
+              <div className="summary-row">
+                <span>Shipping</span>
+                <span>
+                  {subtotal >= brand.shippingThreshold
+                    ? "Free"
+                    : "Calculated next"}
+                </span>
+              </div>
+              <div className="summary-row">
+                <span>Taxes</span>
+                <span>Calculated next</span>
+              </div>
+              <div className="summary-row summary-row--total">
+                <span>Total</span>
+                <span>{formatMoney(subtotal)}</span>
+              </div>
+              <Link href="/checkout" className="btn btn--wide btn--accent">
+                Secure checkout
+              </Link>
+              <p className="checkout-note">
+                Checkout is a UI placeholder. No payment information is
+                collected or processed.
+              </p>
+            </aside>
+          </div>
+        </div>
+      </section>
+    </main>
+  );
+}
