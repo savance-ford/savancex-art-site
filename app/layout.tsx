@@ -1,9 +1,15 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
+import { CartDrawer } from "@/components/cart/CartDrawer";
+import { CartProvider } from "@/components/cart/CartProvider";
+import { MobileNavigation } from "@/components/layout/MobileNavigation";
 import { NewsletterSection } from "@/components/layout/NewsletterSection";
 import { SiteFooter } from "@/components/layout/SiteFooter";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { UtilityBar } from "@/components/layout/UtilityBar";
+import { OverlayProvider } from "@/components/overlays/OverlayProvider";
+import { ToastProvider } from "@/components/overlays/ToastProvider";
+import { SearchOverlay } from "@/components/search/SearchOverlay";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -24,14 +30,23 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
   return (
     <html lang="en">
       <body>
-        <a className="skip-link" href="#main">
-          Skip to content
-        </a>
-        <UtilityBar />
-        <SiteHeader />
-        {children}
-        <NewsletterSection />
-        <SiteFooter />
+        <ToastProvider>
+          <OverlayProvider>
+            <CartProvider>
+              <a className="skip-link" href="#main">
+                Skip to content
+              </a>
+              <UtilityBar />
+              <SiteHeader />
+              {children}
+              <NewsletterSection />
+              <SiteFooter />
+              <CartDrawer />
+              <SearchOverlay />
+              <MobileNavigation />
+            </CartProvider>
+          </OverlayProvider>
+        </ToastProvider>
         <div id="overlay-root" />
         <div id="toast-root" aria-live="polite" />
         <noscript>

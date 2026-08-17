@@ -3,25 +3,25 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { useCart } from "@/components/cart/CartProvider";
 import { MainNavigation } from "@/components/layout/MainNavigation";
 import { MegaMenu } from "@/components/layout/MegaMenu";
-import { MobileNavigation } from "@/components/layout/MobileNavigation";
+import { useStorefrontOverlay } from "@/components/overlays/OverlayProvider";
 import { BagIcon, MenuIcon, SearchIcon } from "@/components/ui/Icons";
 
 export function SiteHeader() {
   const [isMegaMenuOpen, setIsMegaMenuOpen] = useState(false);
-  const [isMobileNavigationOpen, setIsMobileNavigationOpen] = useState(false);
+  const { cartCount, openCartDrawer } = useCart();
+  const {
+    openSearchOverlay,
+    openMobileNavigation,
+    closeOverlay,
+  } = useStorefrontOverlay();
 
   const closeNavigation = useCallback(() => {
     setIsMegaMenuOpen(false);
-    setIsMobileNavigationOpen(false);
-  }, []);
-
-  useEffect(() => {
-    document.body.classList.toggle("is-locked", isMobileNavigationOpen);
-
-    return () => document.body.classList.remove("is-locked");
-  }, [isMobileNavigationOpen]);
+    closeOverlay();
+  }, [closeOverlay]);
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -34,12 +34,22 @@ export function SiteHeader() {
 
   function toggleMegaMenu() {
     setIsMegaMenuOpen((isOpen) => !isOpen);
-    setIsMobileNavigationOpen(false);
+    closeOverlay();
   }
 
-  function openMobileNavigation() {
+  function handleOpenMobileNavigation() {
     setIsMegaMenuOpen(false);
-    setIsMobileNavigationOpen(true);
+    openMobileNavigation();
+  }
+
+  function handleOpenSearchOverlay() {
+    setIsMegaMenuOpen(false);
+    openSearchOverlay();
+  }
+
+  function handleOpenCartDrawer() {
+    setIsMegaMenuOpen(false);
+    openCartDrawer();
   }
 
   return (
@@ -51,7 +61,7 @@ export function SiteHeader() {
             className="icon-button mobile-menu-button"
             data-action="open-mobile"
             aria-label="Open menu"
-            onClick={openMobileNavigation}
+            onClick={handleOpenMobileNavigation}
           >
             <MenuIcon />
           </button>
@@ -75,6 +85,7 @@ export function SiteHeader() {
               className="header-text-action"
               data-action="open-search"
               aria-label="Search"
+              onClick={handleOpenSearchOverlay}
             >
               Search
             </button>
@@ -90,14 +101,16 @@ export function SiteHeader() {
               className="header-text-action cart-button"
               data-action="open-cart"
               aria-label="Open cart"
+              onClick={handleOpenCartDrawer}
             >
-              Cart <span className="cart-count" data-cart-count>0</span>
+              Cart <span className="cart-count" data-cart-count>{cartCount}</span>
             </button>
             <button
               type="button"
               className="icon-button header-icon-search"
               data-action="open-search"
               aria-label="Search"
+              onClick={handleOpenSearchOverlay}
             >
               <SearchIcon />
             </button>
@@ -106,18 +119,15 @@ export function SiteHeader() {
               className="icon-button header-icon-cart"
               data-action="open-cart"
               aria-label="Open cart"
+              onClick={handleOpenCartDrawer}
             >
               <BagIcon />
-              <span className="cart-count" data-cart-count>0</span>
+              <span className="cart-count" data-cart-count>{cartCount}</span>
             </button>
           </div>
         </div>
       </header>
       <MegaMenu isOpen={isMegaMenuOpen} onNavigate={closeNavigation} />
-      <MobileNavigation
-        isOpen={isMobileNavigationOpen}
-        onClose={closeNavigation}
-      />
     </>
   );
 }

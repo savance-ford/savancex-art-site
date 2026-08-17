@@ -3,18 +3,14 @@
 import Image from "next/image";
 import Link from "next/link";
 import { createPortal } from "react-dom";
+import { useStorefrontOverlay } from "@/components/overlays/OverlayProvider";
+import { usePortalRoot } from "@/components/overlays/usePortalRoot";
 import { CloseIcon } from "@/components/ui/Icons";
 
-interface MobileNavigationProps {
-  readonly isOpen: boolean;
-  readonly onClose: () => void;
-}
-
-export function MobileNavigation({ isOpen, onClose }: MobileNavigationProps) {
-  const overlayRoot =
-    typeof document === "undefined"
-      ? null
-      : document.getElementById("overlay-root");
+export function MobileNavigation() {
+  const { activeOverlay, closeOverlay } = useStorefrontOverlay();
+  const isOpen = activeOverlay === "mobile";
+  const overlayRoot = usePortalRoot("overlay-root");
 
   if (!overlayRoot) return null;
 
@@ -26,7 +22,7 @@ export function MobileNavigation({ isOpen, onClose }: MobileNavigationProps) {
       inert={!isOpen}
     >
       <div className="mobile-nav__head">
-        <Link href="/" className="wordmark" onClick={onClose}>
+        <Link href="/" className="wordmark" onClick={closeOverlay}>
           <Image src="/assets/logo.svg" alt="NOCTRA" width={700} height={180} />
         </Link>
         <button
@@ -34,53 +30,53 @@ export function MobileNavigation({ isOpen, onClose }: MobileNavigationProps) {
           className="icon-button"
           data-action="close-mobile"
           aria-label="Close menu"
-          onClick={onClose}
+          onClick={closeOverlay}
         >
           <CloseIcon />
         </button>
       </div>
       <div className="mobile-nav__body">
         <h3>Shop</h3>
-        <Link href="/shop" onClick={onClose}>
+        <Link href="/shop" onClick={closeOverlay}>
           Shop all
         </Link>
-        <Link href="/shop/t-shirts" onClick={onClose}>
+        <Link href="/shop/t-shirts" onClick={closeOverlay}>
           T-Shirts
         </Link>
-        <Link href="/shop/hoodies" onClick={onClose}>
+        <Link href="/shop/hoodies" onClick={closeOverlay}>
           Hoodies
         </Link>
-        <Link href="/shop/crewnecks" onClick={onClose}>
+        <Link href="/shop/crewnecks" onClick={closeOverlay}>
           Crewnecks
         </Link>
         <h3>Collections</h3>
-        <Link href="/collections/after-hours" onClick={onClose}>
+        <Link href="/collections/after-hours" onClick={closeOverlay}>
           After Hours
         </Link>
-        <Link href="/collections/static-bloom" onClick={onClose}>
+        <Link href="/collections/static-bloom" onClick={closeOverlay}>
           Static Bloom
         </Link>
-        <Link href="/collections/archive-01" onClick={onClose}>
+        <Link href="/collections/archive-01" onClick={closeOverlay}>
           Archive 01
         </Link>
         <h3>Brand</h3>
-        <Link href="/about" onClick={onClose}>
+        <Link href="/about" onClick={closeOverlay}>
           Our story
         </Link>
-        <Link href="/reviews" onClick={onClose}>
+        <Link href="/reviews" onClick={closeOverlay}>
           Reviews
         </Link>
         <div className="mobile-nav__utility">
-          <Link href="/track-order" onClick={onClose}>
+          <Link href="/track-order" onClick={closeOverlay}>
             Order status
           </Link>
-          <Link href="/contact" onClick={onClose}>
+          <Link href="/contact" onClick={closeOverlay}>
             Contact
           </Link>
-          <Link href="/size-guide" onClick={onClose}>
+          <Link href="/size-guide" onClick={closeOverlay}>
             Size guide
           </Link>
-          <Link href="/account" onClick={onClose}>
+          <Link href="/account" onClick={closeOverlay}>
             Account
           </Link>
         </div>

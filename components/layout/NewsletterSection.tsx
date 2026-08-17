@@ -1,41 +1,18 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { useState } from "react";
+import { useToast } from "@/components/overlays/ToastProvider";
 
 const TOAST_MESSAGE = "Newsletter signup saved in prototype";
 
 export function NewsletterSection() {
   const [isSubmitted, setIsSubmitted] = useState(false);
-  const [isToastMounted, setIsToastMounted] = useState(false);
-  const [isToastVisible, setIsToastVisible] = useState(false);
-  const hideTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
-  const removeTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
-  const animationFrame = useRef<number>(undefined);
-  const toastRoot =
-    typeof document === "undefined"
-      ? null
-      : document.getElementById("toast-root");
-
-  useEffect(() => {
-    return () => {
-      if (animationFrame.current) cancelAnimationFrame(animationFrame.current);
-      if (hideTimer.current) clearTimeout(hideTimer.current);
-      if (removeTimer.current) clearTimeout(removeTimer.current);
-    };
-  }, []);
+  const { showToast } = useToast();
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setIsSubmitted(true);
-    setIsToastMounted(true);
-    setIsToastVisible(false);
-
-    animationFrame.current = requestAnimationFrame(() => {
-      setIsToastVisible(true);
-    });
-    hideTimer.current = setTimeout(() => setIsToastVisible(false), 2600);
-    removeTimer.current = setTimeout(() => setIsToastMounted(false), 3000);
+    showToast(TOAST_MESSAGE);
   }
 
   return (
@@ -77,14 +54,6 @@ export function NewsletterSection() {
           </form>
         </div>
       </section>
-      {toastRoot && isToastMounted
-        ? createPortal(
-            <div className={`toast${isToastVisible ? " is-visible" : ""}`}>
-              {TOAST_MESSAGE}
-            </div>,
-            toastRoot,
-          )
-        : null}
     </>
   );
 }
