@@ -3,10 +3,7 @@ import type { ReactNode } from "react";
 import { CartDrawer } from "@/components/cart/CartDrawer";
 import { CartProvider } from "@/components/cart/CartProvider";
 import { MobileNavigation } from "@/components/layout/MobileNavigation";
-import { NewsletterSection } from "@/components/layout/NewsletterSection";
-import { SiteFooter } from "@/components/layout/SiteFooter";
-import { SiteHeader } from "@/components/layout/SiteHeader";
-import { UtilityBar } from "@/components/layout/UtilityBar";
+import { StorefrontShell } from "@/components/layout/StorefrontShell";
 import { OverlayProvider } from "@/components/overlays/OverlayProvider";
 import { ToastProvider } from "@/components/overlays/ToastProvider";
 import { SearchOverlay } from "@/components/search/SearchOverlay";
@@ -36,14 +33,7 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
         <ToastProvider>
           <OverlayProvider>
             <CartProvider>
-              <a className="skip-link" href="#main">
-                Skip to content
-              </a>
-              <UtilityBar />
-              <SiteHeader />
-              {children}
-              <NewsletterSection />
-              <SiteFooter />
+              <StorefrontShell>{children}</StorefrontShell>
               <CartDrawer />
               <SearchOverlay />
               <MobileNavigation />
