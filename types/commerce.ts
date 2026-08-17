@@ -3,59 +3,66 @@ export type ProductCategory = "T-Shirts" | "Hoodies" | "Crewnecks";
 export type ProductSize = "S" | "M" | "L" | "XL" | "2XL" | "3XL";
 
 export interface Brand {
-  name: string;
-  tagline: string;
-  shippingThreshold: number;
+  readonly name: string;
+  readonly tagline: string;
+  readonly shippingThreshold: number;
 }
 
 export interface Product {
-  id: string;
-  slug: string;
-  name: string;
-  category: ProductCategory;
-  collection: string;
-  price: number;
-  compareAt: number;
-  badge: string;
-  rating: number;
-  reviews: number;
-  colors: readonly string[];
-  sizes: readonly ProductSize[];
-  image: string;
-  altImage: string;
-  summary: string;
-  features: readonly string[];
-  fit: string;
-  soldOut: boolean;
+  readonly id: string;
+  readonly slug: string;
+  readonly name: string;
+  readonly category: ProductCategory;
+  readonly collection: string;
+  readonly price: number;
+  readonly compareAt: number;
+  readonly badge: string;
+  readonly rating: number;
+  readonly reviews: number;
+  readonly colors: readonly string[];
+  readonly sizes: readonly ProductSize[];
+  readonly image: string;
+  readonly altImage: string;
+  readonly summary: string;
+  readonly features: readonly string[];
+  readonly fit: string;
+  readonly soldOut: boolean;
 }
 
-export interface Collection {
-  slug: string;
-  name: string;
-  eyebrow: string;
-  description: string;
-  image: string;
+export interface ProductCollection {
+  readonly slug: string;
+  readonly name: string;
+  readonly eyebrow: string;
+  readonly description: string;
+  readonly image: string;
 }
 
-export interface Review {
-  name: string;
-  title: string;
-  body: string;
-  rating: number;
-  product: string;
+export interface ProductReview {
+  readonly name: string;
+  readonly title: string;
+  readonly body: string;
+  readonly rating: number;
+  readonly product: string;
 }
 
 export interface CartLine {
-  productId: string;
+  productId: Product["id"];
   color: string;
   size: ProductSize;
   qty: number;
 }
 
-export interface CatalogFilters {
-  categories: ProductCategory[];
-  availableOnly: boolean;
-  under50: boolean;
+export type CartLineKey = `${Product["id"]}::${string}::${ProductSize}`;
+
+export type SortOption = "featured" | "price-asc" | "price-desc" | "name";
+
+export interface CatalogFilterState {
+  readonly categories: readonly ProductCategory[];
+  readonly availableOnly: boolean;
+  readonly under50: boolean;
 }
 
-export type CatalogSort = "featured" | "price-asc" | "price-desc" | "name";
+export interface ProductOptionSelection {
+  readonly color: string;
+  readonly size: ProductSize;
+}

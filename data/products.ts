@@ -4,7 +4,7 @@ export const brand = {
   name: "NOCTRA",
   tagline: "Designed after dark. Built for everywhere.",
   shippingThreshold: 75,
-} satisfies Brand;
+} as const satisfies Brand;
 
 export const products = [
   {
@@ -319,4 +319,4 @@ export const products = [
     fit: "True to size with a straight hem.",
     soldOut: false,
   },
-] satisfies readonly Product[];
+] as const satisfies readonly Product[];

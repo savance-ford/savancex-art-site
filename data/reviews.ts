@@ -1,4 +1,4 @@
-import type { Review } from "@/types/commerce";
+import type { ProductReview } from "@/types/commerce";
 
 export const reviews = [
   {
@@ -43,4 +43,4 @@ export const reviews = [
     rating: 5,
     product: "Double Vision Tee",
   },
-] satisfies readonly Review[];
+] as const satisfies readonly ProductReview[];

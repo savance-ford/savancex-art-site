@@ -1,4 +1,4 @@
-import type { Collection } from "@/types/commerce";
+import type { ProductCollection } from "@/types/commerce";
 
 export const collections = [
   {
@@ -25,4 +25,4 @@ export const collections = [
       "The pieces that defined the first signal: direct graphics, wearable color, and durable blanks.",
     image: "/assets/editorial/editorial-c.jpg",
   },
-] satisfies readonly Collection[];
+] as const satisfies readonly ProductCollection[];
