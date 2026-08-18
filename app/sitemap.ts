@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 import { collections } from "@/data/collections";
-import { products } from "@/data/products";
+import { getAllProducts } from "@/lib/commerce/catalog";
 
 const SITE_URL = "https://savancex.art";
 
@@ -35,7 +35,8 @@ function sitemapEntry(
   };
 }
 
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const products = await getAllProducts();
   const staticEntries = STATIC_ROUTES.map((path) =>
     sitemapEntry(
       path,

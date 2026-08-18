@@ -1,21 +1,25 @@
 "use client";
 
 import Link from "next/link";
-import type { Product, ProductOptionSelection, ProductSize } from "@/types/commerce";
+import type { CommerceVariant } from "@/lib/commerce/types";
+import type { ProductOptionSelection } from "@/types/commerce";
 
 interface ProductOptionsProps {
-  readonly product: Product;
+  readonly variants: readonly CommerceVariant[];
   readonly selection: ProductOptionSelection;
   readonly onColorChange: (color: string) => void;
-  readonly onSizeChange: (size: ProductSize) => void;
+  readonly onSizeChange: (size: string) => void;
 }
 
 export function ProductOptions({
-  product,
+  variants,
   selection,
   onColorChange,
   onSizeChange,
 }: ProductOptionsProps) {
+  const colors = [...new Set(variants.map((variant) => variant.options.color))];
+  const sizes = [...new Set(variants.map((variant) => variant.options.size))];
+
   return (
     <>
       <div className="option-group">
@@ -25,20 +29,27 @@ export function ProductOptions({
           </span>
         </div>
         <div className="swatches">
-          {product.colors.map((color) => (
-            <button
-              type="button"
-              className={`swatch${selection.color === color ? " is-selected" : ""}`}
-              data-action="select-color"
-              data-color={color}
-              aria-pressed={selection.color === color}
-              onClick={() => onColorChange(color)}
-              key={color}
-            >
-              <span className="swatch-dot" />
-              {color}
-            </button>
-          ))}
+          {colors.map((color) => {
+            const available = variants.some(
+              (variant) => variant.available && variant.options.color === color,
+            );
+
+            return (
+              <button
+                type="button"
+                className={`swatch${selection.color === color ? " is-selected" : ""}`}
+                data-action="select-color"
+                data-color={color}
+                aria-pressed={selection.color === color}
+                disabled={!available}
+                onClick={() => onColorChange(color)}
+                key={color}
+              >
+                <span className="swatch-dot" />
+                {color}
+              </button>
+            );
+          })}
         </div>
       </div>
       <div className="option-group">
@@ -49,19 +60,29 @@ export function ProductOptions({
           <Link href="/size-guide">Size guide</Link>
         </div>
         <div className="sizes">
-          {product.sizes.map((size) => (
-            <button
-              type="button"
-              className={`size-button${selection.size === size ? " is-selected" : ""}`}
-              data-action="select-size"
-              data-size={size}
-              aria-pressed={selection.size === size}
-              onClick={() => onSizeChange(size)}
-              key={size}
-            >
-              {size}
-            </button>
-          ))}
+          {sizes.map((size) => {
+            const available = variants.some(
+              (variant) =>
+                variant.available &&
+                variant.options.color === selection.color &&
+                variant.options.size === size,
+            );
+
+            return (
+              <button
+                type="button"
+                className={`size-button${selection.size === size ? " is-selected" : ""}`}
+                data-action="select-size"
+                data-size={size}
+                aria-pressed={selection.size === size}
+                disabled={!available}
+                onClick={() => onSizeChange(size)}
+                key={size}
+              >
+                {size}
+              </button>
+            );
+          })}
         </div>
       </div>
     </>

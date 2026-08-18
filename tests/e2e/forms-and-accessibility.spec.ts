@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { gotoStorefront } from "../helpers/storefront";
 
-const CART_KEY = "savancex-cart-v1";
+const CART_KEY = "savancex-cart-v2";
 
 test("support and newsletter forms validate and remain local", async ({ page }) => {
   const networkSubmissions: string[] = [];
@@ -50,17 +50,19 @@ test("support and newsletter forms validate and remain local", async ({ page }) 
   expect(networkSubmissions).toEqual([]);
 });
 
-test("checkout is explicitly non-transactional and keeps the cart", async ({
-  context,
-  page,
-}) => {
-  const savedCart = [
-    { productId: "signal-loss", color: "Black", size: "M", qty: 1 },
-  ];
-  await context.addInitScript(
-    ({ key, value }) => localStorage.setItem(key, value),
-    { key: CART_KEY, value: JSON.stringify(savedCart) },
-  );
+test("checkout is explicitly non-transactional and keeps the cart", async ({ page }) => {
+  await gotoStorefront(page, "/shop");
+  const productHref = await page
+    .locator(".shop-results .product-card__name a")
+    .first()
+    .getAttribute("href");
+  expect(productHref).toBeTruthy();
+  await gotoStorefront(page, productHref as string);
+  await page.locator('[data-action="add-product"]').click();
+  await page.keyboard.press("Escape");
+  const savedCart = await page.evaluate((key) => localStorage.getItem(key), CART_KEY);
+  expect(savedCart).toBeTruthy();
+
   const apiRequests: string[] = [];
   page.on("request", (request) => {
     if (request.url().includes("/api/")) apiRequests.push(request.url());
@@ -83,7 +85,7 @@ test("checkout is explicitly non-transactional and keeps the cart", async ({
   );
   expect(apiRequests).toEqual([]);
   expect(await page.evaluate((key) => localStorage.getItem(key), CART_KEY)).toBe(
-    JSON.stringify(savedCart),
+    savedCart,
   );
 });
 

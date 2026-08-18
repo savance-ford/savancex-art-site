@@ -1,10 +1,10 @@
-import type { Brand, Product } from "@/types/commerce";
+import type { Product } from "@/types/commerce";
 
-export const brand = {
-  name: "NOCTRA",
-  tagline: "Designed after dark. Built for everywhere.",
-  shippingThreshold: 75,
-} as const satisfies Brand;
+/**
+ * Legacy/reference catalog retained for migration checks and the explicitly
+ * configured local development fallback. Runtime storefront reads use
+ * Supabase.
+ */
 
 export const products = [
   {

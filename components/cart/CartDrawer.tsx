@@ -5,7 +5,7 @@ import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { CartLine } from "@/components/cart/CartLine";
 import { CartProgress } from "@/components/cart/CartProgress";
-import { useCart } from "@/components/cart/CartProvider";
+import { getCartLineKey, useCart } from "@/components/cart/CartProvider";
 import { OverlayBackdrop } from "@/components/overlays/OverlayBackdrop";
 import { useStorefrontOverlay } from "@/components/overlays/OverlayProvider";
 import { usePortalRoot } from "@/components/overlays/usePortalRoot";
@@ -13,7 +13,13 @@ import { CloseIcon } from "@/components/ui/Icons";
 import { formatMoney } from "@/lib/formatting/money";
 
 export function CartDrawer() {
-  const { lines, cartCount, subtotal, isCartDrawerOpen } = useCart();
+  const {
+    lines,
+    cartCount,
+    subtotal,
+    isCartDrawerOpen,
+    catalogAvailable,
+  } = useCart();
   const { closeOverlay } = useStorefrontOverlay();
   const overlayRoot = usePortalRoot("overlay-root");
   const closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -56,15 +62,23 @@ export function CartDrawer() {
           {lines.length ? (
             lines.map((line) => (
               <CartLine
-                key={`${line.productId}::${line.color}::${line.size}`}
+                key={getCartLineKey(line)}
                 line={line}
               />
             ))
           ) : (
             <div className="empty-state" style={{ minHeight: 360 }}>
               <div>
-                <h2>Your bag is empty.</h2>
-                <p>Browse the latest signal.</p>
+                <h2>
+                  {catalogAvailable
+                    ? "Your bag is empty."
+                    : "Signal interrupted."}
+                </h2>
+                <p>
+                  {catalogAvailable
+                    ? "Browse the latest signal."
+                    : "The storefront catalog is temporarily unavailable."}
+                </p>
                 <Link href="/shop" className="btn" onClick={closeOverlay}>
                   Continue shopping
                 </Link>

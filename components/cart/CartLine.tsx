@@ -4,8 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { getCartLineKey, useCart } from "@/components/cart/CartProvider";
 import { useStorefrontOverlay } from "@/components/overlays/OverlayProvider";
-import { getAllProducts } from "@/lib/commerce/catalog";
-import { formatMoney } from "@/lib/formatting/money";
+import { formatCommercePrice } from "@/lib/commerce/pricing";
 import type { CartLine as CartLineData } from "@/types/commerce";
 
 interface CartLineProps {
@@ -13,9 +12,9 @@ interface CartLineProps {
 }
 
 export function CartLine({ line }: CartLineProps) {
-  const { incrementLine, decrementLine, removeLine } = useCart();
+  const { catalog, incrementLine, decrementLine, removeLine } = useCart();
   const { closeOverlay } = useStorefrontOverlay();
-  const product = getAllProducts().find((item) => item.id === line.productId);
+  const product = catalog.find((item) => item.id === line.productId);
 
   if (!product) return null;
 
@@ -34,6 +33,7 @@ export function CartLine({ line }: CartLineProps) {
           alt={product.name}
           width={600}
           height={750}
+          unoptimized
         />
       </Link>
       <div>
@@ -55,7 +55,7 @@ export function CartLine({ line }: CartLineProps) {
           >
             −
           </button>
-          <span>{line.qty}</span>
+          <span>{line.quantity}</span>
           <button
             type="button"
             data-action="qty-inc"
@@ -68,7 +68,12 @@ export function CartLine({ line }: CartLineProps) {
         </div>
       </div>
       <div className="cart-line__price">
-        <strong>{formatMoney(product.price * line.qty)}</strong>
+        <strong>
+          {formatCommercePrice({
+            ...line.displayPrice,
+            amount: line.displayPrice.amount * line.quantity,
+          })}
+        </strong>
         <button
           type="button"
           className="remove-link"

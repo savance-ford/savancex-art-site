@@ -17,24 +17,26 @@ interface ProductPageProps {
   readonly params: Promise<{ slug: string }>;
 }
 
-export function generateStaticParams() {
-  return getAllProducts().map((product) => ({ slug: product.slug }));
+export const revalidate = 300;
+
+export async function generateStaticParams() {
+  return (await getAllProducts()).map((product) => ({ slug: product.slug }));
 }
 
 export async function generateMetadata({
   params,
 }: ProductPageProps): Promise<Metadata> {
   const { slug } = await params;
-  const product = getProductBySlug(slug);
+  const product = await getProductBySlug(slug);
   if (!product) notFound();
 
   return {
     title: product.name,
-    description: product.summary,
+    description: product.description,
     alternates: { canonical: `/products/${product.slug}` },
     openGraph: {
       title: product.name,
-      description: product.summary,
+      description: product.description,
       images: [{ url: product.image, alt: product.name }],
     },
   };
@@ -42,10 +44,10 @@ export async function generateMetadata({
 
 export default async function ProductPage({ params }: ProductPageProps) {
   const { slug } = await params;
-  const product = getProductBySlug(slug);
+  const product = await getProductBySlug(slug);
   if (!product) notFound();
 
-  const relatedProducts = getRelatedProducts(product, 5);
+  const relatedProducts = await getRelatedProducts(product, 5);
 
   return (
     <main id="main">

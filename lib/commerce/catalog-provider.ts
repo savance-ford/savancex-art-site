@@ -11,5 +11,4 @@ export interface CatalogProvider {
   getInventory(variantId: string): Promise<number | null>;
 }
 
-/** Active provider selection for the current local-data storefront. */
-export { localCatalogProvider as catalogProvider } from "@/lib/commerce/local-catalog-provider";
+export { catalogProvider } from "@/lib/commerce/provider-selection";

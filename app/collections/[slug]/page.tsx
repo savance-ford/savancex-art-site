@@ -15,6 +15,8 @@ interface CollectionPageProps {
   readonly params: Promise<{ slug: string }>;
 }
 
+export const revalidate = 300;
+
 export function generateStaticParams() {
   return collections.map((collection) => ({ slug: collection.slug }));
 }
@@ -43,7 +45,7 @@ export default async function CollectionPage({ params }: CollectionPageProps) {
   const collection = getCollectionBySlug(slug);
   if (!collection) notFound();
 
-  const products = getProductsByCollection(collection.name);
+  const products = await getProductsByCollection(collection.name);
 
   return (
     <main id="main">

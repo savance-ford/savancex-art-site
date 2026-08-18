@@ -1,8 +1,8 @@
 import { ProductCard } from "@/components/catalog/ProductCard";
-import type { Product } from "@/types/commerce";
+import type { CatalogProduct } from "@/lib/commerce/types";
 
 interface ProductRailProps {
-  readonly products: readonly Product[];
+  readonly products: readonly CatalogProduct[];
 }
 
 export function ProductRail({ products }: ProductRailProps) {

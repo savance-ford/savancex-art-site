@@ -21,7 +21,10 @@ function toVariantSegment(value: string): string {
   return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-");
 }
 
-function toCommerceProduct(product: Product): CommerceProduct {
+function toCommerceProduct(
+  product: Product,
+  featured: boolean,
+): CommerceProduct {
   return Object.freeze({
     id: product.id,
     externalId: null,
@@ -35,6 +38,7 @@ function toCommerceProduct(product: Product): CommerceProduct {
     image: product.image,
     alternateImage: product.altImage,
     badge: product.badge || null,
+    featured,
     rating: product.rating,
     reviewCount: product.reviews,
     features: product.features,
@@ -50,6 +54,8 @@ function toCommerceVariants(product: Product): readonly CommerceVariant[] {
         Object.freeze({
           id: `local:${product.id}:${toVariantSegment(color)}:${toVariantSegment(size)}`,
           externalId: null,
+          printfulSyncVariantId: null,
+          printfulCatalogVariantId: null,
           productId: product.id,
           name: `${color} / ${size}`,
           sku: null,
@@ -64,7 +70,7 @@ function toCommerceVariants(product: Product): readonly CommerceVariant[] {
 }
 
 const localProducts: readonly CommerceProduct[] = Object.freeze(
-  products.map(toCommerceProduct),
+  products.map((product, index) => toCommerceProduct(product, index < 6)),
 );
 const localVariants: readonly CommerceVariant[] = Object.freeze(
   products.flatMap(toCommerceVariants),

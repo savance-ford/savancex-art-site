@@ -1,8 +1,8 @@
 # Catalog diagnostics
 
 Catalog diagnostics are read-only administrative checks against the Supabase
-commerce tables. They do not change the storefront's active catalog provider or
-write catalog data.
+commerce tables. They do not write catalog data or invalidate the storefront's
+cached normalized catalog.
 
 ## Protected endpoint
 
@@ -82,5 +82,6 @@ credential in `package.json`.
 
 ## Storefront status
 
-`LocalCatalogProvider` remains active. These diagnostics verify the database
-catalog only; they do not switch storefront reads to Supabase.
+`SupabaseCatalogProvider` is the active runtime provider. The local provider is
+retained only for the explicit non-production
+`COMMERCE_CATALOG_FALLBACK=local` fallback and migration/reference work.

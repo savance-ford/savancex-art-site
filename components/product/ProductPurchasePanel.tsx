@@ -3,21 +3,34 @@
 import { useState } from "react";
 import { useCart } from "@/components/cart/CartProvider";
 import { ProductOptions } from "@/components/product/ProductOptions";
-import type { Product, ProductOptionSelection } from "@/types/commerce";
+import { formatCommercePrice } from "@/lib/commerce/pricing";
+import type {
+  CatalogProduct,
+  CommerceVariant,
+} from "@/lib/commerce/types";
+import type { ProductOptionSelection } from "@/types/commerce";
 
 interface ProductPurchasePanelProps {
-  readonly product: Product;
+  readonly product: CatalogProduct;
 }
 
-function getInitialSelection(product: Product): ProductOptionSelection {
-  const color = product.colors[0];
-  const size = product.sizes.includes("M") ? "M" : product.sizes[0];
+function getPreferredVariant(
+  variants: readonly CommerceVariant[],
+): CommerceVariant | undefined {
+  const availableVariants = variants.filter((variant) => variant.available);
+  return (
+    availableVariants.find((variant) => variant.options.size === "M") ??
+    availableVariants[0]
+  );
+}
 
-  if (!color || !size) {
-    throw new Error(`Product ${product.id} must define at least one variant`);
-  }
+function getInitialSelection(product: CatalogProduct): ProductOptionSelection {
+  const variant = getPreferredVariant(product.variants);
 
-  return { color, size };
+  return {
+    color: variant?.options.color ?? "",
+    size: variant?.options.size ?? "",
+  };
 }
 
 export function ProductPurchasePanel({ product }: ProductPurchasePanelProps) {
@@ -25,15 +38,40 @@ export function ProductPurchasePanel({ product }: ProductPurchasePanelProps) {
     getInitialSelection(product),
   );
   const { addItem } = useCart();
+  const selectedVariant = product.variants.find(
+    (variant) =>
+      variant.available &&
+      variant.options.color === selection.color &&
+      variant.options.size === selection.size,
+  );
+  const displayedPrice = selectedVariant?.price ?? product.defaultPrice;
+
+  function handleColorChange(color: string) {
+    const colorVariants = product.variants.filter(
+      (variant) => variant.available && variant.options.color === color,
+    );
+    const nextVariant =
+      colorVariants.find((variant) => variant.options.size === selection.size) ??
+      getPreferredVariant(colorVariants);
+
+    if (nextVariant) {
+      setSelection({ color, size: nextVariant.options.size });
+    }
+  }
 
   return (
     <>
+      <div className="product-price">
+        {product.compareAtPrice ? (
+          <s>{formatCommercePrice(product.compareAtPrice)}</s>
+        ) : null}
+        <strong>{formatCommercePrice(displayedPrice)} USD</strong>
+      </div>
+      <p className="product-summary">{product.description}</p>
       <ProductOptions
-        product={product}
+        variants={product.variants}
         selection={selection}
-        onColorChange={(color) =>
-          setSelection((current) => ({ ...current, color }))
-        }
+        onColorChange={handleColorChange}
         onSizeChange={(size) =>
           setSelection((current) => ({ ...current, size }))
         }
@@ -43,16 +81,14 @@ export function ProductPurchasePanel({ product }: ProductPurchasePanelProps) {
         className="btn btn--wide btn--accent"
         data-action="add-product"
         data-product={product.id}
-        disabled={product.soldOut}
+        disabled={!selectedVariant}
         onClick={() =>
-          addItem({
-            productId: product.id,
-            color: selection.color,
-            size: selection.size,
-          })
+          selectedVariant
+            ? addItem({ productId: product.id, variantId: selectedVariant.id })
+            : undefined
         }
       >
-        {product.soldOut ? "Sold out" : "Add to bag"}
+        {!selectedVariant ? "Sold out" : "Add to bag"}
       </button>
     </>
   );

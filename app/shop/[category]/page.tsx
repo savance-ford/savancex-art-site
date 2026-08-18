@@ -12,6 +12,7 @@ interface CategoryPageProps {
 }
 
 const CATEGORY_SLUGS = ["t-shirts", "hoodies", "crewnecks"] as const;
+export const revalidate = 300;
 
 export function generateStaticParams() {
   return CATEGORY_SLUGS.map((category) => ({ category }));
@@ -41,7 +42,7 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
 
   return (
     <CatalogPage
-      products={getProductsByCategory(category)}
+      products={await getProductsByCategory(category)}
       category={category}
     />
   );

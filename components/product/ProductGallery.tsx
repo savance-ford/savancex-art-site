@@ -1,8 +1,8 @@
 import Image from "next/image";
-import type { Product } from "@/types/commerce";
+import type { CatalogProduct } from "@/lib/commerce/types";
 
 interface ProductGalleryProps {
-  readonly product: Product;
+  readonly product: CatalogProduct;
 }
 
 export function ProductGallery({ product }: ProductGalleryProps) {
@@ -21,7 +21,7 @@ export function ProductGallery({ product }: ProductGalleryProps) {
       </div>
       <div className="product-gallery__item">
         <Image
-          src={product.altImage}
+          src={product.alternateImage}
           alt={`${product.name} back placeholder`}
           width={800}
           height={900}
