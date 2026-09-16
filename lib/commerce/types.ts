@@ -19,6 +19,7 @@ export interface CommerceProduct {
   readonly image: string;
   readonly alternateImage: string;
   readonly badge: string | null;
+  readonly featured: boolean;
   readonly rating: number;
   readonly reviewCount: number;
   readonly features: readonly string[];
@@ -29,8 +30,12 @@ export interface CommerceProduct {
 export interface CommerceVariant {
   /** Storefront-owned variant ID. */
   readonly id: string;
-  /** Optional provider-owned ID, such as a future Printful variant ID. */
+  /** Optional external commerce-platform variant ID. */
   readonly externalId: string | null;
+  /** Printful Sync API variant ID used to resolve the store's synced variant. */
+  readonly printfulSyncVariantId: string | null;
+  /** Printful catalog variant ID used by fulfillment. */
+  readonly printfulCatalogVariantId: string | null;
   readonly productId: CommerceProduct["id"];
   readonly name: string;
   readonly sku: string | null;
@@ -38,6 +43,14 @@ export interface CommerceVariant {
   readonly price: CommercePrice;
   readonly image: string;
   readonly available: boolean;
+}
+
+/**
+ * Storefront presentation record composed entirely from normalized commerce
+ * entities. Provider-specific rows never cross this boundary.
+ */
+export interface CatalogProduct extends CommerceProduct {
+  readonly variants: readonly CommerceVariant[];
 }
 
 export interface CheckoutLine {

@@ -1,8 +1,8 @@
 import { ProductGrid } from "@/components/catalog/ProductGrid";
-import type { Product } from "@/types/commerce";
+import type { CatalogProduct } from "@/lib/commerce/types";
 
 interface CoreCollectionSectionProps {
-  readonly products: readonly Product[];
+  readonly products: readonly CatalogProduct[];
 }
 
 export function CoreCollectionSection({ products }: CoreCollectionSectionProps) {

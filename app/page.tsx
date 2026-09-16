@@ -13,10 +13,14 @@ import {
   getFeaturedProducts,
 } from "@/lib/commerce/catalog";
 
-export default function HomePage() {
-  const featuredProducts = getFeaturedProducts();
-  const capsuleProducts = getCapsuleProducts();
-  const coreProducts = getCoreProducts();
+export const revalidate = 300;
+
+export default async function HomePage() {
+  const [featuredProducts, capsuleProducts, coreProducts] = await Promise.all([
+    getFeaturedProducts(),
+    getCapsuleProducts(),
+    getCoreProducts(),
+  ]);
 
   return (
     <main id="main">

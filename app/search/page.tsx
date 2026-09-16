@@ -8,6 +8,7 @@ export const metadata: Metadata = {
   title: "Search",
   alternates: { canonical: "/search" },
 };
+export const revalidate = 300;
 
 interface SearchPageProps {
   readonly searchParams: Promise<{ q?: string | string[] }>;
@@ -17,13 +18,14 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   const { q = "" } = await searchParams;
   const query = Array.isArray(q) ? (q[0] ?? "") : q;
   const normalizedQuery = query.trim().toLowerCase();
+  const allProducts = await getAllProducts();
   const products = normalizedQuery
-    ? getAllProducts().filter((product) =>
-        `${product.name} ${product.category} ${product.collection} ${product.summary}`
+    ? allProducts.filter((product) =>
+        `${product.name} ${product.category} ${product.collection} ${product.description}`
           .toLowerCase()
           .includes(normalizedQuery),
       )
-    : getAllProducts();
+    : allProducts;
 
   return (
     <main id="main">

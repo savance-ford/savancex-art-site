@@ -1,9 +1,10 @@
 # Commerce integration plan
 
-This phase defines integration boundaries only. The storefront continues to use
-the local product records in `data/products.ts`; no Stripe or Printful SDK,
-credentials, network calls, checkout session, fulfillment order, or webhook
-processing is active.
+The storefront reads its runtime catalog from Supabase through the normalized
+catalog boundary. `data/products.ts` remains legacy/reference data and may be
+used only by the explicitly configured non-production fallback. Printful is an
+upstream synchronization source and is never called during storefront renders.
+Stripe checkout, fulfillment orders, and transactional webhooks remain inactive.
 
 ## Provider boundaries
 
@@ -13,25 +14,20 @@ processing is active.
   trusted server code.
 - `FulfillmentProvider` will estimate shipping, submit paid orders, and retrieve
   fulfillment status from trusted server code.
-- `localCatalogProvider` is the current active provider. Existing synchronous
-  catalog helpers remain in place so this architectural seam does not force a
-  visual or behavioral rewrite.
+- `supabaseCatalogProvider` is the active provider. Async catalog helpers compose
+  normalized products with their normalized active variants for the existing UI.
 
 Concrete adapters that consume secrets must import `server-only` and live in a
 server-only module. Client Components may import shared types, but must never
 import a secret-consuming adapter.
 
-## 1. Storefront IDs and future Printful IDs
+## 1. Storefront and Printful IDs
 
-The current IDs, such as `signal-loss`, are storefront-owned product IDs. The
-current cart identifies a selection with `productId::color::size`. The local
-catalog adapter derives stable variant IDs such as
-`local:signal-loss:black:m`, but these are still storefront IDs.
-
-Printful will supply separate product and variant identifiers. A Printful
-variant ID identifies a specific fulfillable item and must not replace the
-storefront product ID implicitly. The future catalog mapping should persist an
-explicit relationship:
+Supabase stores stable storefront-owned product and variant IDs separately from
+Printful identifiers. The v2 cart is keyed by `productId::variantId` and retains
+both the Printful Sync variant ID and Printful catalog variant ID on each line.
+A Printful identifier never implicitly replaces a storefront identifier. The
+persisted relationship is:
 
 ```text
 storefront product ID + selected options
@@ -45,16 +41,10 @@ unreadable.
 
 ## 2. Printful catalog entry point
 
-A future Printful catalog adapter will implement `CatalogProvider` and normalize
-Printful products and variants into `CommerceProduct` and `CommerceVariant`.
-Provider-specific payloads should stop at that adapter boundary. Route pages and
-components should receive normalized commerce records rather than raw Printful
-responses.
-
-The initial migration can keep editorial copy, collection assignments, badges,
-ratings, and local imagery in the storefront data while attaching Printful IDs
-to variants. Full catalog synchronization can be introduced later without
-changing the provider contract.
+Printful synchronizes upstream data into Supabase. `SupabaseCatalogProvider`
+normalizes persisted products and variants into `CommerceProduct` and
+`CommerceVariant`; provider-specific database rows stop at that boundary.
+Route pages and components never receive raw Printful responses.
 
 ## 3. Stripe Checkout Session creation
 
@@ -133,19 +123,18 @@ Secrets must never be logged, returned by Route Handlers, or imported into a
 Client Component. `.env.example` contains no credentials, and a real
 `.env.local` is not created by this phase.
 
-## 10. Placeholder components that will change
+## 10. Remaining placeholder components
 
 - `components/forms/CheckoutForm.tsx` will submit validated cart identifiers to
   the checkout Route Handler and redirect to the hosted session instead of
   displaying an in-memory confirmation.
 - `components/cart/CartProvider.tsx`, `CartPageClient.tsx`, and the cart drawer
-  will eventually persist normalized variant IDs while preserving selected
-  option labels for display.
-- `components/product/ProductOptions.tsx` and
-  `ProductPurchasePanel.tsx` will select real provider-backed variants and use
-  normalized inventory.
-- Catalog and product Route Components can move from the synchronous local
-  helpers to `CatalogProvider` once an external adapter is ready.
+  already persist and resolve normalized variant IDs. Server checkout must still
+  re-resolve every price and identifier before accepting payment.
+- `components/product/ProductOptions.tsx` and `ProductPurchasePanel.tsx` select
+  active normalized variants and reject unavailable combinations.
+- Catalog and product Route Components use async Supabase-backed helpers in
+  Server Components.
 - `components/forms/TrackingForm.tsx` can retrieve a normalized fulfillment
   status through a server endpoint after durable orders exist.
 

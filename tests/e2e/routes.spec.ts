@@ -1,6 +1,4 @@
 import { expect, test, type Page } from "@playwright/test";
-import { collections } from "../../data/collections";
-import { products } from "../../data/products";
 import { gotoStorefront } from "../helpers/storefront";
 
 const staticRoutes = [
@@ -22,11 +20,17 @@ const staticRoutes = [
   "/account",
 ] as const;
 
-const publicRoutes = [
-  ...staticRoutes,
-  ...collections.map((collection) => `/collections/${collection.slug}`),
-  ...products.map((product) => `/products/${product.slug}`),
-];
+async function getPublicRoutes(page: Page): Promise<readonly string[]> {
+  const sitemap = await (await page.request.get("/sitemap.xml")).text();
+  const dynamicRoutes = Array.from(
+    sitemap.matchAll(
+      /<loc>https:\/\/savancex\.art(\/(?:collections|products)\/[^<]+)<\/loc>/g,
+    ),
+    (match) => match[1],
+  );
+
+  return [...staticRoutes, ...dynamicRoutes];
+}
 
 function monitorBrowser(page: Page) {
   const errors: string[] = [];
@@ -59,6 +63,7 @@ test("every public route renders and survives a direct refresh", async ({
 }) => {
   test.setTimeout(120_000);
   const assertNoBrowserErrors = monitorBrowser(page);
+  const publicRoutes = await getPublicRoutes(page);
 
   for (const route of publicRoutes) {
     await test.step(route, async () => {
@@ -66,6 +71,7 @@ test("every public route renders and survives a direct refresh", async ({
       const response = await page.reload({ waitUntil: "domcontentloaded" });
       expect(response?.status(), `${route} refresh status`).toBeLessThan(400);
       await expect(page.locator("body")).not.toContainText("Signal lost.");
+      await expect(page.locator("body")).not.toContainText("Signal interrupted.");
     });
   }
 
@@ -108,6 +114,7 @@ test("site metadata endpoints use the production origin", async ({ page }) => {
   }
 
   const sitemap = await (await page.request.get("/sitemap.xml")).text();
+  const publicRoutes = await getPublicRoutes(page);
   for (const route of publicRoutes) {
     const expectedUrl = route === "/" ? "https://savancex.art" : `https://savancex.art${route}`;
     expect(sitemap, `sitemap entry for ${route}`).toContain(expectedUrl);

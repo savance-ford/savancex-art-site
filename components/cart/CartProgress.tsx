@@ -1,4 +1,4 @@
-import { brand } from "@/data/products";
+import { brand } from "@/data/brand";
 import { formatMoney } from "@/lib/formatting/money";
 
 interface CartProgressProps {

@@ -1,8 +1,8 @@
 import { ProductRail } from "@/components/catalog/ProductRail";
-import type { Product } from "@/types/commerce";
+import type { CatalogProduct } from "@/lib/commerce/types";
 
 interface RelatedProductsProps {
-  readonly products: readonly Product[];
+  readonly products: readonly CatalogProduct[];
 }
 
 export function RelatedProducts({ products }: RelatedProductsProps) {

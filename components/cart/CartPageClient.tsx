@@ -3,17 +3,15 @@
 import Link from "next/link";
 import { CartLine } from "@/components/cart/CartLine";
 import { CartProgress } from "@/components/cart/CartProgress";
-import { useCart } from "@/components/cart/CartProvider";
+import { getCartLineKey, useCart } from "@/components/cart/CartProvider";
 import { ProductRail } from "@/components/catalog/ProductRail";
 import { AnnouncementMarquee } from "@/components/layout/AnnouncementMarquee";
-import { brand } from "@/data/products";
-import { getAllProducts } from "@/lib/commerce/catalog";
+import { brand } from "@/data/brand";
 import { formatMoney } from "@/lib/formatting/money";
 
-const POPULAR_PRODUCTS = getAllProducts().slice(0, 5);
-
 export function CartPageClient() {
-  const { lines, cartCount, subtotal } = useCart();
+  const { catalog, catalogAvailable, lines, cartCount, subtotal } = useCart();
+  const popularProducts = catalog.slice(0, 5);
 
   if (!lines.length) {
     return (
@@ -23,8 +21,14 @@ export function CartPageClient() {
           <div className="container empty-state">
             <div>
               <span className="kicker">Cart (0)</span>
-              <h2>Your bag is empty.</h2>
-              <p>Start with the latest drop or browse the full catalog.</p>
+              <h2>
+                {catalogAvailable ? "Your bag is empty." : "Signal interrupted."}
+              </h2>
+              <p>
+                {catalogAvailable
+                  ? "Start with the latest drop or browse the full catalog."
+                  : "The storefront catalog is temporarily unavailable."}
+              </p>
               <Link href="/shop" className="btn">
                 Continue shopping
               </Link>
@@ -39,7 +43,7 @@ export function CartPageClient() {
                 <h2 className="section-title">Start here.</h2>
               </div>
             </div>
-            <ProductRail products={POPULAR_PRODUCTS} />
+            <ProductRail products={popularProducts} />
           </div>
         </section>
       </main>
@@ -61,7 +65,7 @@ export function CartPageClient() {
             <div className="cart-list">
               {lines.map((line) => (
                 <CartLine
-                  key={`${line.productId}::${line.color}::${line.size}`}
+                  key={getCartLineKey(line)}
                   line={line}
                 />
               ))}

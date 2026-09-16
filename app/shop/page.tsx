@@ -11,6 +11,8 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export default function ShopPage() {
-  return <CatalogPage products={getAllProducts()} />;
+export const revalidate = 300;
+
+export default async function ShopPage() {
+  return <CatalogPage products={await getAllProducts()} />;
 }

@@ -1,3 +1,5 @@
+import type { CommercePrice } from "@/lib/commerce/types";
+
 export type ProductCategory = "T-Shirts" | "Hoodies" | "Crewnecks";
 
 export type ProductSize = "S" | "M" | "L" | "XL" | "2XL" | "3XL";
@@ -46,13 +48,19 @@ export interface ProductReview {
 }
 
 export interface CartLine {
-  productId: Product["id"];
+  /** Storefront-owned product and variant identifiers. */
+  productId: string;
+  variantId: string;
+  printfulSyncVariantId: string | null;
+  printfulCatalogVariantId: string | null;
   color: string;
-  size: ProductSize;
-  qty: number;
+  size: string;
+  quantity: number;
+  /** Display-only snapshot. Checkout must re-resolve price on the server. */
+  displayPrice: CommercePrice;
 }
 
-export type CartLineKey = `${Product["id"]}::${string}::${ProductSize}`;
+export type CartLineKey = `${string}::${string}`;
 
 export type SortOption = "featured" | "price-asc" | "price-desc" | "name";
 
@@ -64,5 +72,5 @@ export interface CatalogFilterState {
 
 export interface ProductOptionSelection {
   readonly color: string;
-  readonly size: ProductSize;
+  readonly size: string;
 }

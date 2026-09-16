@@ -7,9 +7,9 @@ import { ProductCard } from "@/components/catalog/ProductCard";
 import { useStorefrontOverlay } from "@/components/overlays/OverlayProvider";
 import type {
   CatalogFilterState,
-  Product,
   SortOption,
 } from "@/types/commerce";
+import type { CatalogProduct } from "@/lib/commerce/types";
 
 const EMPTY_FILTERS: CatalogFilterState = {
   categories: [],
@@ -18,32 +18,36 @@ const EMPTY_FILTERS: CatalogFilterState = {
 };
 
 interface CatalogClientProps {
-  readonly products: readonly Product[];
+  readonly products: readonly CatalogProduct[];
   readonly categoryPills: ReactNode;
   readonly initialGrid: ReactNode;
 }
 
 function applyCatalogState(
-  products: readonly Product[],
+  products: readonly CatalogProduct[],
   filters: CatalogFilterState,
   sort: SortOption,
-): readonly Product[] {
+): readonly CatalogProduct[] {
   let result = [...products];
 
   if (filters.categories.length) {
     result = result.filter((product) =>
-      filters.categories.includes(product.category),
+      filters.categories.some((category) => category === product.category),
     );
   }
   if (filters.availableOnly) {
-    result = result.filter((product) => !product.soldOut);
+    result = result.filter((product) => product.available);
   }
   if (filters.under50) {
-    result = result.filter((product) => product.price < 50);
+    result = result.filter((product) => product.defaultPrice.amount < 5_000);
   }
 
-  if (sort === "price-asc") result.sort((a, b) => a.price - b.price);
-  if (sort === "price-desc") result.sort((a, b) => b.price - a.price);
+  if (sort === "price-asc") {
+    result.sort((a, b) => a.defaultPrice.amount - b.defaultPrice.amount);
+  }
+  if (sort === "price-desc") {
+    result.sort((a, b) => b.defaultPrice.amount - a.defaultPrice.amount);
+  }
   if (sort === "name") result.sort((a, b) => a.name.localeCompare(b.name));
 
   return result;

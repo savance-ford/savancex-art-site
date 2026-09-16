@@ -1,10 +1,10 @@
 import { ProductGrid } from "@/components/catalog/ProductGrid";
 import { ArrowIcon } from "@/components/ui/Icons";
-import type { Product } from "@/types/commerce";
+import type { CatalogProduct } from "@/lib/commerce/types";
 
 interface SearchResultsProps {
   readonly query: string;
-  readonly products: readonly Product[];
+  readonly products: readonly CatalogProduct[];
 }
 
 export function SearchResults({ query, products }: SearchResultsProps) {

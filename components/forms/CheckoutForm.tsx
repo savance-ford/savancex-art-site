@@ -6,16 +6,12 @@ import { useState } from "react";
 import { CartPageClient } from "@/components/cart/CartPageClient";
 import { useCart } from "@/components/cart/CartProvider";
 import { useToast } from "@/components/overlays/ToastProvider";
-import { brand } from "@/data/products";
-import { getAllProducts } from "@/lib/commerce/catalog";
+import { brand } from "@/data/brand";
+import { formatCommercePrice } from "@/lib/commerce/pricing";
 import { formatMoney } from "@/lib/formatting/money";
 
-const PRODUCTS_BY_ID = new Map(
-  getAllProducts().map((product) => [product.id, product] as const),
-);
-
 export function CheckoutForm() {
-  const { lines, subtotal } = useCart();
+  const { catalog, lines, subtotal } = useCart();
   const { showToast } = useToast();
   const [isConfirmed, setIsConfirmed] = useState(false);
 
@@ -153,27 +149,33 @@ export function CheckoutForm() {
         <h2>Order summary</h2>
         <div className="mini-order">
           {lines.map((line) => {
-            const product = PRODUCTS_BY_ID.get(line.productId);
+            const product = catalog.find((item) => item.id === line.productId);
             if (!product) return null;
 
             return (
               <div
                 className="mini-order__line"
-                key={`${line.productId}::${line.color}::${line.size}`}
+                key={`${line.productId}::${line.variantId}`}
               >
                 <Image
                   src={product.image}
                   alt={product.name}
                   width={72}
                   height={88}
+                  unoptimized
                 />
                 <div>
                   <strong>{product.name}</strong>
                   <small>
-                    {line.color} / {line.size} × {line.qty}
+                    {line.color} / {line.size} × {line.quantity}
                   </small>
                 </div>
-                <b>{formatMoney(product.price * line.qty)}</b>
+                <b>
+                  {formatCommercePrice({
+                    ...line.displayPrice,
+                    amount: line.displayPrice.amount * line.quantity,
+                  })}
+                </b>
               </div>
             );
           })}

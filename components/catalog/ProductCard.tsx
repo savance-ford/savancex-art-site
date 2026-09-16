@@ -3,25 +3,37 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useCart } from "@/components/cart/CartProvider";
-import { formatMoney } from "@/lib/formatting/money";
-import type { Product } from "@/types/commerce";
+import {
+  formatCommercePrice,
+  hasVariableVariantPrices,
+} from "@/lib/commerce/pricing";
+import type { CatalogProduct } from "@/lib/commerce/types";
 
 interface ProductCardProps {
-  readonly product: Product;
+  readonly product: CatalogProduct;
 }
 
 export function ProductCard({ product }: ProductCardProps) {
   const { addItem } = useCart();
-  const badge = product.soldOut ? "Sold out" : product.badge;
+  const badge = !product.available ? "Sold out" : product.badge;
+  const colorCount = new Set(
+    product.variants.map((variant) => variant.options.color),
+  ).size;
   const badgeClasses = [
     "product-card__badge",
-    product.soldOut ? "product-card__badge--sold" : "",
+    !product.available ? "product-card__badge--sold" : "",
   ]
     .filter(Boolean)
     .join(" ");
 
   return (
-    <article className="product-card" data-product-card={product.id}>
+    <article
+      className="product-card"
+      data-product-card={product.id}
+      data-category={product.category}
+      data-price={product.defaultPrice.amount}
+      data-available={product.available}
+    >
       <div className="product-card__media">
         <Link
           href={`/products/${product.slug}`}
@@ -38,7 +50,7 @@ export function ProductCard({ product }: ProductCardProps) {
             unoptimized
           />
           <Image
-            src={product.altImage}
+            src={product.alternateImage}
             alt={`${product.name} back placeholder`}
             width={800}
             height={900}
@@ -51,10 +63,10 @@ export function ProductCard({ product }: ProductCardProps) {
           className="quick-add"
           data-action="quick-add"
           data-product={product.id}
-          disabled={product.soldOut}
+          disabled={!product.available}
           onClick={() => addItem({ productId: product.id })}
         >
-          {product.soldOut ? "Sold out" : "Quick add"}
+          {!product.available ? "Sold out" : "Quick add"}
         </button>
       </div>
       <div className="product-card__body">
@@ -63,21 +75,26 @@ export function ProductCard({ product }: ProductCardProps) {
         </h3>
         <div className="product-card__reviews">
           <span aria-hidden="true">★★★★★</span>{" "}
-          <small>{product.reviews} reviews</small>
+          <small>{product.reviewCount} reviews</small>
         </div>
         <div className="product-card__meta">
           <div className="product-card__price">
             <span className="product-card__compare">
-              {formatMoney(product.compareAt)}
+              {product.compareAtPrice
+                ? formatCommercePrice(product.compareAtPrice)
+                : null}
             </span>
-            <strong>{formatMoney(product.price)}</strong>
+            <strong>
+              {hasVariableVariantPrices(product.variants) ? "From " : ""}
+              {formatCommercePrice(product.defaultPrice)}
+            </strong>
           </div>
           <div
             className="product-card__dots"
-            aria-label={`${product.colors.length} colors`}
+            aria-label={`${colorCount} colors`}
           >
             <span />
-            {product.colors.length > 1 ? <span /> : null}
+            {colorCount > 1 ? <span /> : null}
           </div>
         </div>
       </div>

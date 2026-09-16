@@ -1,10 +1,10 @@
 import { ProductCard } from "@/components/catalog/ProductCard";
-import type { Product } from "@/types/commerce";
+import type { CatalogProduct } from "@/lib/commerce/types";
 
 type ProductGridColumnCount = 3 | 4;
 
 interface ProductGridProps {
-  readonly products: readonly Product[];
+  readonly products: readonly CatalogProduct[];
   readonly columns?: ProductGridColumnCount;
 }
 

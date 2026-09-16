@@ -4,38 +4,38 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useSyncExternalStore,
   type ReactNode,
 } from "react";
-import { getAllProducts } from "@/lib/commerce/catalog";
 import { useStorefrontOverlay } from "@/components/overlays/OverlayProvider";
 import { useToast } from "@/components/overlays/ToastProvider";
 import type {
-  CartLine,
-  CartLineKey,
-  Product,
-  ProductSize,
-} from "@/types/commerce";
+  CatalogProduct,
+  CommerceVariant,
+} from "@/lib/commerce/types";
+import type { CartLine, CartLineKey } from "@/types/commerce";
 
-export const CART_STORAGE_KEY = "savancex-cart-v1";
+export const CART_STORAGE_KEY = "savancex-cart-v2";
+export const LEGACY_CART_STORAGE_KEY = "savancex-cart-v1";
 
 const CART_CHANGE_EVENT = "savancex-cart-change";
 const EMPTY_CART_SNAPSHOT = "[]";
-const productsById = new Map(
-  getAllProducts().map((product) => [product.id, product] as const),
-);
 
 let fallbackSnapshot: string | null = null;
 
 export interface AddCartItemInput {
-  readonly productId: Product["id"];
+  readonly productId: string;
+  readonly variantId?: string;
   readonly color?: string;
-  readonly size?: ProductSize;
+  readonly size?: string;
   readonly quantity?: number;
 }
 
 interface CartContextValue {
+  readonly catalog: readonly CatalogProduct[];
+  readonly catalogAvailable: boolean;
   readonly lines: readonly CartLine[];
   readonly cartCount: number;
   readonly subtotal: number;
@@ -50,6 +50,12 @@ interface CartContextValue {
   readonly closeCartDrawer: () => void;
 }
 
+interface CartProviderProps {
+  readonly catalog: readonly CatalogProduct[];
+  readonly catalogAvailable: boolean;
+  readonly children: ReactNode;
+}
+
 const CartContext = createContext<CartContextValue | undefined>(undefined);
 
 function getServerCartSnapshot(): string {
@@ -61,7 +67,11 @@ function getCartSnapshot(): string {
   if (fallbackSnapshot !== null) return fallbackSnapshot;
 
   try {
-    return window.localStorage.getItem(CART_STORAGE_KEY) ?? EMPTY_CART_SNAPSHOT;
+    return (
+      window.localStorage.getItem(CART_STORAGE_KEY) ??
+      window.localStorage.getItem(LEGACY_CART_STORAGE_KEY) ??
+      EMPTY_CART_SNAPSHOT
+    );
   } catch {
     return EMPTY_CART_SNAPSHOT;
   }
@@ -69,7 +79,10 @@ function getCartSnapshot(): string {
 
 function subscribeToCart(onStoreChange: () => void): () => void {
   function handleStorage(event: StorageEvent) {
-    if (event.key === CART_STORAGE_KEY) {
+    if (
+      event.key === CART_STORAGE_KEY ||
+      event.key === LEGACY_CART_STORAGE_KEY
+    ) {
       fallbackSnapshot = null;
       onStoreChange();
     }
@@ -96,51 +109,85 @@ function getServerHydratedSnapshot(): boolean {
   return false;
 }
 
-function parseCartSnapshot(snapshot: string): CartLine[] {
+function preferredVariant(
+  variants: readonly CommerceVariant[],
+): CommerceVariant | undefined {
+  const available = variants.filter((variant) => variant.available);
+  return (
+    available.find((variant) => variant.options.size === "M") ?? available[0]
+  );
+}
+
+function resolveVariant(
+  candidate: object,
+  product: CatalogProduct,
+): CommerceVariant | undefined {
+  const variantId = Reflect.get(candidate, "variantId");
+  if (typeof variantId === "string") {
+    return product.variants.find(
+      (variant) => variant.id === variantId && variant.available,
+    );
+  }
+
+  const color = Reflect.get(candidate, "color");
+  const size = Reflect.get(candidate, "size");
+  if (typeof color !== "string" || typeof size !== "string") return undefined;
+
+  return product.variants.find(
+    (variant) =>
+      variant.available &&
+      variant.options.color === color &&
+      variant.options.size === size,
+  );
+}
+
+function parseCartSnapshot(
+  snapshot: string,
+  catalog: readonly CatalogProduct[],
+): CartLine[] {
   try {
     const value: unknown = JSON.parse(snapshot);
     if (!Array.isArray(value)) return [];
 
+    const productsById = new Map(
+      catalog.map((product) => [product.id, product] as const),
+    );
     const mergedLines = new Map<CartLineKey, CartLine>();
 
     for (const candidate of value) {
       if (!candidate || typeof candidate !== "object") continue;
 
       const productId = Reflect.get(candidate, "productId");
-      const color = Reflect.get(candidate, "color");
-      const size = Reflect.get(candidate, "size");
-      const qty = Reflect.get(candidate, "qty");
-
+      const storedQuantity =
+        Reflect.get(candidate, "quantity") ?? Reflect.get(candidate, "qty");
       if (
         typeof productId !== "string" ||
-        typeof color !== "string" ||
-        typeof size !== "string" ||
-        typeof qty !== "number" ||
-        !Number.isSafeInteger(qty) ||
-        qty < 1
+        typeof storedQuantity !== "number" ||
+        !Number.isSafeInteger(storedQuantity) ||
+        storedQuantity < 1
       ) {
         continue;
       }
 
       const product = productsById.get(productId);
-      if (
-        !product ||
-        !product.colors.includes(color) ||
-        !product.sizes.includes(size as ProductSize)
-      ) {
-        continue;
-      }
+      if (!product) continue;
+      const variant = resolveVariant(candidate, product);
+      if (!variant) continue;
 
       const line: CartLine = {
-        productId,
-        color,
-        size: size as ProductSize,
-        qty,
+        productId: product.id,
+        variantId: variant.id,
+        printfulSyncVariantId: variant.printfulSyncVariantId,
+        printfulCatalogVariantId: variant.printfulCatalogVariantId,
+        color: variant.options.color,
+        size: variant.options.size,
+        quantity: storedQuantity,
+        displayPrice: variant.price,
       };
       const key = getCartLineKey(line);
       const existing = mergedLines.get(key);
 
-      if (existing) existing.qty += line.qty;
+      if (existing) existing.quantity += line.quantity;
       else mergedLines.set(key, line);
     }
 
@@ -163,19 +210,17 @@ function writeCart(lines: readonly CartLine[]): void {
   window.dispatchEvent(new Event(CART_CHANGE_EVENT));
 }
 
-function updateCart(
-  update: (currentLines: readonly CartLine[]) => readonly CartLine[],
-): void {
-  writeCart(update(parseCartSnapshot(getCartSnapshot())));
-}
-
 export function getCartLineKey(
-  line: Pick<CartLine, "productId" | "color" | "size">,
+  line: Pick<CartLine, "productId" | "variantId">,
 ): CartLineKey {
-  return `${line.productId}::${line.color}::${line.size}`;
+  return `${line.productId}::${line.variantId}`;
 }
 
-export function CartProvider({ children }: { readonly children: ReactNode }) {
+export function CartProvider({
+  catalog,
+  catalogAvailable,
+  children,
+}: CartProviderProps) {
   const snapshot = useSyncExternalStore(
     subscribeToCart,
     getCartSnapshot,
@@ -186,7 +231,14 @@ export function CartProvider({ children }: { readonly children: ReactNode }) {
     getHydratedSnapshot,
     getServerHydratedSnapshot,
   );
-  const lines = useMemo(() => parseCartSnapshot(snapshot), [snapshot]);
+  const lines = useMemo(
+    () => parseCartSnapshot(snapshot, catalog),
+    [catalog, snapshot],
+  );
+  const productsById = useMemo(
+    () => new Map(catalog.map((product) => [product.id, product] as const)),
+    [catalog],
+  );
   const {
     activeOverlay,
     openCartDrawer,
@@ -194,55 +246,89 @@ export function CartProvider({ children }: { readonly children: ReactNode }) {
   } = useStorefrontOverlay();
   const { showToast } = useToast();
 
+  useEffect(() => {
+    if (!catalogAvailable) return;
+
+    try {
+      if (
+        window.localStorage.getItem(CART_STORAGE_KEY) === null &&
+        window.localStorage.getItem(LEGACY_CART_STORAGE_KEY) !== null
+      ) {
+        writeCart(lines);
+      }
+    } catch {
+      // Storage may be unavailable; the in-memory snapshot still works.
+    }
+  }, [catalogAvailable, lines]);
+
+  const updateCart = useCallback(
+    (update: (currentLines: readonly CartLine[]) => readonly CartLine[]) => {
+      writeCart(update(parseCartSnapshot(getCartSnapshot(), catalog)));
+    },
+    [catalog],
+  );
+
   const cartCount = useMemo(
-    () => lines.reduce((total, line) => total + line.qty, 0),
+    () => lines.reduce((total, line) => total + line.quantity, 0),
     [lines],
   );
   const subtotal = useMemo(
     () =>
-      lines.reduce((total, line) => {
-        const product = productsById.get(line.productId);
-        return total + (product ? product.price * line.qty : 0);
-      }, 0),
+      lines.reduce(
+        (total, line) =>
+          total + (line.displayPrice.amount / 100) * line.quantity,
+        0,
+      ),
     [lines],
   );
 
   const addItem = useCallback(
     ({
       productId,
-      color: requestedColor,
-      size: requestedSize,
+      variantId,
+      color,
+      size,
       quantity = 1,
     }: AddCartItemInput) => {
       const product = productsById.get(productId);
-      if (!product || product.soldOut) return;
+      if (!product?.available) return;
 
-      const color =
-        requestedColor && product.colors.includes(requestedColor)
-          ? requestedColor
-          : product.colors[0];
-      const defaultSize = product.sizes.includes("M")
-        ? "M"
-        : product.sizes[0];
-      const size =
-        requestedSize && product.sizes.includes(requestedSize)
-          ? requestedSize
-          : defaultSize;
+      const variant = variantId
+        ? product.variants.find(
+            (candidate) => candidate.id === variantId && candidate.available,
+          )
+        : product.variants.find(
+            (candidate) =>
+              candidate.available &&
+              (!color || candidate.options.color === color) &&
+              (!size || candidate.options.size === size),
+          ) ?? preferredVariant(product.variants);
       const safeQuantity = Number.isSafeInteger(quantity)
         ? Math.max(1, quantity)
         : 1;
-
-      if (!color || !size) return;
+      if (!variant) return;
 
       updateCart((currentLines) => {
         const nextLines = currentLines.map((line) => ({ ...line }));
-        const key = getCartLineKey({ productId, color, size });
+        const key = getCartLineKey({ productId, variantId: variant.id });
         const existing = nextLines.find(
           (line) => getCartLineKey(line) === key,
         );
 
-        if (existing) existing.qty += safeQuantity;
-        else nextLines.push({ productId, color, size, qty: safeQuantity });
+        if (existing) {
+          existing.quantity += safeQuantity;
+        } else {
+          nextLines.push({
+            productId,
+            variantId: variant.id,
+            printfulSyncVariantId: variant.printfulSyncVariantId,
+            printfulCatalogVariantId: variant.printfulCatalogVariantId,
+            color: variant.options.color,
+            size: variant.options.size,
+            quantity: safeQuantity,
+            displayPrice: variant.price,
+          });
+        }
 
         return nextLines;
       });
@@ -250,36 +336,51 @@ export function CartProvider({ children }: { readonly children: ReactNode }) {
       showToast(`${product.name} added to bag`);
       openCartDrawer();
     },
-    [openCartDrawer, showToast],
+    [openCartDrawer, productsById, showToast, updateCart],
   );
 
-  const incrementLine = useCallback((key: CartLineKey) => {
-    updateCart((currentLines) =>
-      currentLines.map((line) =>
-        getCartLineKey(line) === key ? { ...line, qty: line.qty + 1 } : line,
-      ),
-    );
-  }, []);
+  const incrementLine = useCallback(
+    (key: CartLineKey) => {
+      updateCart((currentLines) =>
+        currentLines.map((line) =>
+          getCartLineKey(line) === key
+            ? { ...line, quantity: line.quantity + 1 }
+            : line,
+        ),
+      );
+    },
+    [updateCart],
+  );
 
-  const decrementLine = useCallback((key: CartLineKey) => {
-    updateCart((currentLines) =>
-      currentLines.flatMap((line) => {
-        if (getCartLineKey(line) !== key) return [line];
-        return line.qty > 1 ? [{ ...line, qty: line.qty - 1 }] : [];
-      }),
-    );
-  }, []);
+  const decrementLine = useCallback(
+    (key: CartLineKey) => {
+      updateCart((currentLines) =>
+        currentLines.flatMap((line) => {
+          if (getCartLineKey(line) !== key) return [line];
+          return line.quantity > 1
+            ? [{ ...line, quantity: line.quantity - 1 }]
+            : [];
+        }),
+      );
+    },
+    [updateCart],
+  );
 
-  const removeLine = useCallback((key: CartLineKey) => {
-    updateCart((currentLines) =>
-      currentLines.filter((line) => getCartLineKey(line) !== key),
-    );
-  }, []);
+  const removeLine = useCallback(
+    (key: CartLineKey) => {
+      updateCart((currentLines) =>
+        currentLines.filter((line) => getCartLineKey(line) !== key),
+      );
+    },
+    [updateCart],
+  );
 
   const clearCart = useCallback(() => writeCart([]), []);
 
   const value = useMemo<CartContextValue>(
     () => ({
+      catalog,
+      catalogAvailable,
       lines,
       cartCount,
       subtotal,
@@ -294,6 +395,8 @@ export function CartProvider({ children }: { readonly children: ReactNode }) {
       closeCartDrawer,
     }),
     [
+      catalog,
+      catalogAvailable,
       lines,
       cartCount,
       subtotal,
