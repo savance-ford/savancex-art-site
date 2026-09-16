@@ -97,8 +97,8 @@ export function CartPageClient() {
                 Secure checkout
               </Link>
               <p className="checkout-note">
-                Checkout is a UI placeholder. No payment information is
-                collected or processed.
+                Stripe test mode only. Shipping and taxes are not charged in
+                this test phase.
               </p>
             </aside>
           </div>

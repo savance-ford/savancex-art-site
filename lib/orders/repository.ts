@@ -24,6 +24,7 @@ export class OrderValidationError extends TypeError {
 }
 
 type PaidOrderDetails = {
+  stripeCheckoutSessionId: string;
   stripePaymentIntentId?: string | null;
   stripeCustomerId?: string | null;
   customerEmail?: string | null;
@@ -220,13 +221,14 @@ export async function attachStripeSession(
 
 export async function markOrderPaid(
   orderId: string,
-  details: PaidOrderDetails = {},
+  details: PaidOrderDetails,
 ): Promise<DatabaseOrder> {
   const { data, error } = await getSupabaseAdminClient()
     .from("orders")
     .update({
       status: "paid",
       payment_status: "paid",
+      stripe_checkout_session_id: details.stripeCheckoutSessionId,
       stripe_payment_intent_id: details.stripePaymentIntentId,
       stripe_customer_id: details.stripeCustomerId,
       customer_email: details.customerEmail,
@@ -236,50 +238,122 @@ export async function markOrderPaid(
       paid_at: details.paidAt ?? new Date().toISOString(),
     })
     .eq("id", orderId)
+    .neq("payment_status", "paid")
     .select("*")
     .maybeSingle();
 
-  if (error || !data) {
+  if (error) {
+    throw new OrderRepositoryError("Unable to mark the order as paid.");
+  }
+
+  if (!data) {
+    const existingOrder = await getOrderById(orderId);
+    if (existingOrder?.payment_status === "paid") return existingOrder;
     throw new OrderRepositoryError("Unable to mark the order as paid.");
   }
 
   return data;
 }
 
-export async function markOrderPaymentFailed(
+export async function markOrderPaymentProcessing(
   orderId: string,
+  stripeSessionId: string,
 ): Promise<DatabaseOrder> {
   const { data, error } = await getSupabaseAdminClient()
     .from("orders")
-    .update({ status: "payment_failed", payment_status: "failed" })
-    .eq("id", orderId)
-    .neq("payment_status", "paid")
-    .select("*")
-    .maybeSingle();
-
-  if (error || !data) {
-    throw new OrderRepositoryError(
-      "Unable to mark the order payment as failed.",
-    );
-  }
-
-  return data;
-}
-
-export async function markOrderExpired(
-  orderId: string,
-): Promise<DatabaseOrder> {
-  const { data, error } = await getSupabaseAdminClient()
-    .from("orders")
-    .update({ status: "expired" })
+    .update({
+      status: "checkout_created",
+      payment_status: "processing",
+      stripe_checkout_session_id: stripeSessionId,
+    })
     .eq("id", orderId)
     .eq("payment_status", "unpaid")
     .select("*")
     .maybeSingle();
 
-  if (error || !data) {
+  if (error) {
+    throw new OrderRepositoryError(
+      "Unable to mark the order payment as processing.",
+    );
+  }
+
+  return data ?? (await getOrderById(orderId)) ?? missingOrder();
+}
+
+export async function markOrderPaymentReview(
+  orderId: string,
+  stripeSessionId: string,
+  stripePaymentIntentId: string | null,
+): Promise<DatabaseOrder> {
+  const { data, error } = await getSupabaseAdminClient()
+    .from("orders")
+    .update({
+      status: "payment_review",
+      payment_status: "processing",
+      stripe_checkout_session_id: stripeSessionId,
+      stripe_payment_intent_id: stripePaymentIntentId,
+    })
+    .eq("id", orderId)
+    .neq("payment_status", "paid")
+    .select("*")
+    .maybeSingle();
+
+  if (error) {
+    throw new OrderRepositoryError(
+      "Unable to mark the order for payment review.",
+    );
+  }
+
+  return data ?? (await getOrderById(orderId)) ?? missingOrder();
+}
+
+export async function markOrderPaymentFailed(
+  orderId: string,
+  stripeSessionId?: string,
+): Promise<DatabaseOrder> {
+  const { data, error } = await getSupabaseAdminClient()
+    .from("orders")
+    .update({
+      status: "payment_failed",
+      payment_status: "failed",
+      stripe_checkout_session_id: stripeSessionId,
+    })
+    .eq("id", orderId)
+    .neq("payment_status", "paid")
+    .select("*")
+    .maybeSingle();
+
+  if (error) {
+    throw new OrderRepositoryError(
+      "Unable to mark the order payment as failed.",
+    );
+  }
+
+  return data ?? (await getOrderById(orderId)) ?? missingOrder();
+}
+
+export async function markOrderExpired(
+  orderId: string,
+  stripeSessionId?: string,
+): Promise<DatabaseOrder> {
+  const { data, error } = await getSupabaseAdminClient()
+    .from("orders")
+    .update({
+      status: "expired",
+      stripe_checkout_session_id: stripeSessionId,
+    })
+    .eq("id", orderId)
+    .neq("payment_status", "paid")
+    .select("*")
+    .maybeSingle();
+
+  if (error) {
     throw new OrderRepositoryError("Unable to mark the order as expired.");
   }
 
-  return data;
+  return data ?? (await getOrderById(orderId)) ?? missingOrder();
+}
+
+function missingOrder(): never {
+  throw new OrderRepositoryError("The order no longer exists.");
 }

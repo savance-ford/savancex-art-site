@@ -26,3 +26,21 @@ export function getStripeClient(): Stripe {
   stripeClient = new Stripe(secretKey);
   return stripeClient;
 }
+
+export function getStripeWebhookSecret(): string {
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+  if (!webhookSecret) {
+    throw new StripeConfigurationError(
+      "Stripe webhooks are not configured. Missing: STRIPE_WEBHOOK_SECRET.",
+    );
+  }
+
+  if (!webhookSecret.startsWith("whsec_")) {
+    throw new StripeConfigurationError(
+      "STRIPE_WEBHOOK_SECRET must be a Stripe webhook signing secret.",
+    );
+  }
+
+  return webhookSecret;
+}

@@ -52,6 +52,10 @@ export type DatabaseOrder = {
   shipping_address: JsonValue | null;
   printful_order_id: string | null;
   printful_external_id: string | null;
+  printful_status: string | null;
+  printful_last_error: string | null;
+  printful_last_attempt_at: string | null;
+  printful_draft_created_at: string | null;
   paid_at: string | null;
   created_at: string;
   updated_at: string;
