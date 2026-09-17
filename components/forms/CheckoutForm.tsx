@@ -9,18 +9,64 @@ import { useToast } from "@/components/overlays/ToastProvider";
 import { brand } from "@/data/brand";
 import { formatCommercePrice } from "@/lib/commerce/pricing";
 import { formatMoney } from "@/lib/formatting/money";
+import type {
+  CheckoutErrorResponse,
+  CheckoutRequest,
+  CheckoutResponse,
+} from "@/lib/stripe/checkout-types";
 
 export function CheckoutForm() {
   const { catalog, lines, subtotal } = useCart();
   const { showToast } = useToast();
-  const [isConfirmed, setIsConfirmed] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!lines.length) return <CartPageClient />;
 
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setIsConfirmed(true);
-    showToast("Demo order confirmed — no payment was processed");
+    if (isSubmitting) return;
+
+    const checkoutRequest: CheckoutRequest = {
+      items: lines.map((line) => ({
+        variantId: line.variantId,
+        quantity: line.quantity,
+      })),
+    };
+
+    setIsSubmitting(true);
+    try {
+      const response = await fetch("/api/stripe/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(checkoutRequest),
+      });
+      const responseBody: unknown = await response.json();
+
+      if (!response.ok) {
+        const message =
+          responseBody &&
+          typeof responseBody === "object" &&
+          typeof (responseBody as CheckoutErrorResponse).error === "string"
+            ? (responseBody as CheckoutErrorResponse).error
+            : "Checkout is temporarily unavailable.";
+        throw new Error(message);
+      }
+
+      const checkoutUrl = (responseBody as CheckoutResponse | null)
+        ?.checkoutUrl;
+      if (typeof checkoutUrl !== "string" || !checkoutUrl) {
+        throw new Error("Checkout returned an invalid redirect URL.");
+      }
+
+      window.location.assign(checkoutUrl);
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Checkout is temporarily unavailable.";
+      showToast(message);
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -128,21 +174,22 @@ export function CheckoutForm() {
         </div>
         <h2>Payment</h2>
         <div className="checkout-placeholder">
-          <strong>Payment placeholder</strong>
+          <strong>Secure Stripe Checkout</strong>
           <br />
-          Connect Shopify, Stripe, or another commerce backend here.
+          Payment and delivery details are collected securely by Stripe.
         </div>
         <button
           className="btn btn--wide"
           type="submit"
           style={{ marginTop: 22 }}
+          disabled={isSubmitting}
+          aria-busy={isSubmitting}
         >
-          Complete demo order
+          {isSubmitting ? "Opening secure checkout…" : "Continue to payment"}
         </button>
         <p className="checkout-note" aria-live="polite">
-          {isConfirmed
-            ? "Demo order confirmed in this session — no payment was processed and no order was sent."
-            : "This button only displays a prototype confirmation."}
+          Stripe test mode only. Shipping and tax are not charged during this
+          test phase.
         </p>
       </form>
       <aside className="checkout-side">

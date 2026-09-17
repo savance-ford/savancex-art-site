@@ -10,6 +10,7 @@ const staticRoutes = [
   "/search",
   "/cart",
   "/checkout",
+  "/checkout/success",
   "/reviews",
   "/about",
   "/contact",
@@ -119,4 +120,15 @@ test("site metadata endpoints use the production origin", async ({ page }) => {
     const expectedUrl = route === "/" ? "https://savancex.art" : `https://savancex.art${route}`;
     expect(sitemap, `sitemap entry for ${route}`).toContain(expectedUrl);
   }
+});
+
+test("Stripe webhook rejects unsigned requests", async ({ page }) => {
+  const response = await page.request.post("/api/stripe/webhook", {
+    data: { type: "checkout.session.completed" },
+  });
+
+  expect(response.status()).toBe(400);
+  await expect(response.json()).resolves.toEqual({
+    error: "Missing Stripe signature.",
+  });
 });
