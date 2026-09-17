@@ -26,14 +26,14 @@ fulfillment data.
 The normalized recipient mapping is:
 
 - `shipping_address.name` -> `recipient.name`
-- `customer_email` -> `recipient.email` when present
-- `customer_phone` -> `recipient.phone` when present
-- `shipping_address.address_line_1` -> `recipient.address1`
-- `shipping_address.address_line_2` -> `recipient.address2` when present
+- `shipping_address.email` -> `recipient.email`
+- `shipping_address.phone` -> `recipient.phone` when present
+- `shipping_address.addressLine1` -> `recipient.address1`
+- `shipping_address.addressLine2` -> `recipient.address2` when present
 - `shipping_address.city` -> `recipient.city`
-- `shipping_address.state` -> `recipient.state_code`
-- `shipping_address.country` -> `recipient.country_code`
-- `shipping_address.postal_code` -> `recipient.zip`
+- `shipping_address.stateCode` -> `recipient.state_code`
+- `shipping_address.countryCode` -> `recipient.country_code`
+- `shipping_address.postalCode` -> `recipient.zip`
 
 Each Printful item contains the Supabase order-item UUID as `external_id`, the
 stored `printful_sync_variant_id` as `sync_variant_id`, and the immutable order
@@ -48,10 +48,12 @@ The existing server-only Printful client sends:
 POST https://api.printful.com/orders?update_existing=true
 ```
 
-The payload uses `shipping=STANDARD`. Order and order-item external IDs are their
-respective lowercase Supabase UUIDs with hyphens removed. Each is exactly 32
-hexadecimal characters, remains stable across retries, and fits Printful's
-external-ID limit. The order value is persisted in
+The payload uses the Printful method selected from a live quote and persisted on
+the order. A legacy order created before shipping quotes can fall back to
+`shipping=STANDARD`; a newly quoted order cannot. Order and order-item external
+IDs are their respective lowercase Supabase UUIDs with hyphens removed. Each is
+exactly 32 hexadecimal characters, remains stable across retries, and fits
+Printful's external-ID limit. The order value is persisted in
 `orders.printful_external_id`.
 
 A failed order that still contains the legacy `savancex-{SUPABASE_ORDER_UUID}`
@@ -123,6 +125,6 @@ failure is recorded as a fulfillment failure, logged safely, and swallowed by
 the payment handler. Stripe webhook processing can therefore complete while the
 paid order remains available for an administrative retry.
 
-Shipping and tax remain zero in this test phase. Printful shipping-rate
-selection, Stripe shipping charges, taxes, live payments, and automatic Printful
+The selected Printful rate is revalidated and charged through Stripe before the
+order is created. Tax remains zero. Taxes, live payments, and automatic Printful
 confirmation remain future work.

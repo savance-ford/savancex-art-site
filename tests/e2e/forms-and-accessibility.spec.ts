@@ -50,7 +50,9 @@ test("support and newsletter forms validate and remain local", async ({ page }) 
   expect(networkSubmissions).toEqual([]);
 });
 
-test("checkout is explicitly non-transactional and keeps the cart", async ({ page }) => {
+test("checkout quotes shipping before starting Stripe and keeps the cart", async ({
+  page,
+}) => {
   await gotoStorefront(page, "/shop");
   const productHref = await page
     .locator(".shop-results .product-card__name a")
@@ -63,27 +65,83 @@ test("checkout is explicitly non-transactional and keeps the cart", async ({ pag
   const savedCart = await page.evaluate((key) => localStorage.getItem(key), CART_KEY);
   expect(savedCart).toBeTruthy();
 
-  const apiRequests: string[] = [];
-  page.on("request", (request) => {
-    if (request.url().includes("/api/")) apiRequests.push(request.url());
+  let quoteRequest: Record<string, unknown> | null = null;
+  let checkoutRequest: Record<string, unknown> | null = null;
+  await page.route("**/api/shipping/quote", async (route) => {
+    quoteRequest = route.request().postDataJSON() as Record<string, unknown>;
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        rates: [
+          {
+            id: "STANDARD",
+            name: "Flat Rate",
+            amountCents: 495,
+            currency: "USD",
+            minDeliveryDays: 3,
+            maxDeliveryDays: 6,
+            minDeliveryDate: null,
+            maxDeliveryDate: null,
+          },
+        ],
+      }),
+    });
+  });
+  await page.route("**/api/stripe/checkout", async (route) => {
+    checkoutRequest = route.request().postDataJSON() as Record<string, unknown>;
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        checkoutUrl: `${new URL(page.url()).origin}/checkout?stripe_mock=1`,
+        orderId: "11111111-1111-4111-8111-111111111111",
+      }),
+    });
   });
 
   await gotoStorefront(page, "/checkout");
-  await expect(page.getByText("Payment placeholder", { exact: true })).toBeVisible();
+  await expect(page.getByText("Secure Stripe Checkout", { exact: true })).toBeVisible();
   await expect(page.locator('input[name*="card" i]')).toHaveCount(0);
 
+  await page.getByLabel("Full name").fill("Test Customer");
   await page.getByLabel("Email").fill("customer@example.com");
-  await page.getByLabel("First name").fill("Test");
-  await page.getByLabel("Last name").fill("Customer");
-  await page.getByLabel("Address").fill("123 Test Street");
+  await page.getByLabel("Street address").fill("4708 Creekwood Lane");
+  await page
+    .getByLabel("Apartment, suite, unit, etc. (optional)")
+    .fill("308");
   await page.getByLabel("City").fill("Madison");
-  await page.getByLabel("State").selectOption("Wisconsin");
-  await page.getByLabel("ZIP code").fill("53703");
-  await page.getByRole("button", { name: "Complete demo order" }).click();
-  await expect(page.locator(".checkout-note")).toContainText(
-    "no payment was processed and no order was sent",
-  );
-  expect(apiRequests).toEqual([]);
+  await page.getByLabel("State").selectOption("WI");
+  await page.getByLabel("ZIP code").fill("53704");
+  await page.getByRole("button", { name: "Get shipping methods" }).click();
+  await expect(page.getByText("Flat Rate", { exact: true })).toBeVisible();
+  await expect(page.getByText("$4.95", { exact: true })).toBeVisible();
+
+  expect(quoteRequest).toMatchObject({
+    address: {
+      name: "Test Customer",
+      email: "customer@example.com",
+      addressLine1: "4708 Creekwood Lane",
+      addressLine2: "308",
+      city: "Madison",
+      stateCode: "WI",
+      postalCode: "53704",
+      countryCode: "US",
+    },
+  });
+
+  await page.getByRole("button", { name: "Continue to payment" }).click();
+  await expect(page).toHaveURL(/stripe_mock=1/);
+  expect(checkoutRequest).toMatchObject({
+    shippingMethodId: "STANDARD",
+    shippingAddress: {
+      addressLine1: "4708 Creekwood Lane",
+      addressLine2: "308",
+      stateCode: "WI",
+      countryCode: "US",
+    },
+  });
+  expect(checkoutRequest).not.toHaveProperty("shippingCents");
+  expect(checkoutRequest).not.toHaveProperty("subtotal");
+  expect(checkoutRequest).not.toHaveProperty("total");
   expect(await page.evaluate((key) => localStorage.getItem(key), CART_KEY)).toBe(
     savedCart,
   );

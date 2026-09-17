@@ -174,6 +174,13 @@ type DatabaseOrderInsert = {
   currency?: string;
   subtotal_cents?: number;
   shipping_cents?: number;
+  shipping_method_id?: string | null;
+  shipping_method_name?: string | null;
+  shipping_min_delivery_days?: number | null;
+  shipping_max_delivery_days?: number | null;
+  shipping_min_delivery_date?: string | null;
+  shipping_max_delivery_date?: string | null;
+  shipping_rate_quoted_at?: string | null;
   tax_cents?: number;
   total_cents?: number;
   stripe_checkout_session_id?: string | null;

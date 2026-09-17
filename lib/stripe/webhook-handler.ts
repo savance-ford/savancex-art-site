@@ -17,6 +17,11 @@ import {
 } from "@/lib/printful/orders";
 import { getStripeClient } from "@/lib/stripe/client";
 import {
+  normalizeShippingAddress,
+  preserveExistingShippingAddress,
+  type NormalizedShippingAddress,
+} from "@/lib/shipping/address";
+import {
   StripeOrderResolutionError,
   resolveOrderForCheckoutSession,
 } from "@/lib/stripe/session-orders";
@@ -50,21 +55,32 @@ function expandableId(
   return value?.id ?? null;
 }
 
-function normalizeShippingAddress(
+function normalizeStripeShippingAddress(
   session: Stripe.Checkout.Session,
-): JsonValue | null {
+): NormalizedShippingAddress | null {
   const shipping = session.collected_information?.shipping_details;
   if (!shipping) return null;
+  const customer = session.customer_details;
 
-  return {
-    name: shipping.name,
-    address_line_1: shipping.address.line1,
-    address_line_2: shipping.address.line2,
-    city: shipping.address.city,
-    state: shipping.address.state,
-    postal_code: shipping.address.postal_code,
-    country: shipping.address.country,
-  };
+  try {
+    return normalizeShippingAddress({
+      name: shipping.name,
+      email: customer?.email ?? session.customer_email,
+      phone: customer?.phone,
+      addressLine1: shipping.address.line1,
+      addressLine2: shipping.address.line2,
+      city: shipping.address.city,
+      stateCode: shipping.address.state,
+      postalCode: shipping.address.postal_code,
+      countryCode: shipping.address.country,
+    });
+  } catch {
+    return null;
+  }
+}
+
+function nonEmpty(value: string | null | undefined): string | null {
+  return value?.trim() || null;
 }
 
 function eventCheckoutSessionId(event: Stripe.Event): string {
@@ -141,18 +157,26 @@ async function processSuccessfulSession(
 
   const customerDetails = session.customer_details;
   const shippingDetails = session.collected_information?.shipping_details;
+  const stripeShippingAddress = normalizeStripeShippingAddress(session);
   const paidOrder = await markOrderPaid(order.id, {
     stripeCheckoutSessionId: session.id,
     stripePaymentIntentId: paymentIntentId,
     stripeCustomerId: expandableId(session.customer),
-    customerEmail: customerDetails?.email ?? session.customer_email,
+    customerEmail:
+      nonEmpty(customerDetails?.email ?? session.customer_email) ??
+      order.customer_email,
     customerName:
-      shippingDetails?.name ??
-      customerDetails?.individual_name ??
-      customerDetails?.name ??
-      null,
-    customerPhone: customerDetails?.phone ?? null,
-    shippingAddress: normalizeShippingAddress(session),
+      nonEmpty(
+        shippingDetails?.name ??
+          customerDetails?.individual_name ??
+          customerDetails?.name,
+      ) ?? order.customer_name,
+    customerPhone:
+      nonEmpty(customerDetails?.phone) ?? order.customer_phone,
+    shippingAddress: preserveExistingShippingAddress(
+      order.shipping_address,
+      stripeShippingAddress,
+    ) as JsonValue | null,
     paidAt: new Date().toISOString(),
   });
   await attemptPrintfulDraft(paidOrder.id);

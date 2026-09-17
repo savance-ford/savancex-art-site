@@ -21,7 +21,8 @@ provide the values through the deployment platform's secret management:
 - `CATALOG_SYNC_SECRET`
 - `STRIPE_SECRET_KEY` (server-only and test mode only)
 - `STRIPE_WEBHOOK_SECRET` (server-only)
-- `CHECKOUT_ALLOWED_COUNTRIES` (comma-separated ISO codes; defaults to `US`)
+- `CHECKOUT_ALLOWED_COUNTRIES` (legacy configuration; checkout currently accepts
+  normalized US addresses only)
 
 Never expose either Stripe secret through a `NEXT_PUBLIC_` variable, commit it to
 source control, or log it. `.env.local` remains ignored by Git.
@@ -57,22 +58,31 @@ and uses integer arithmetic rather than floating-point multiplication.
 
 ## Hosted Checkout flow
 
-The browser submits only storefront variant IDs and integer quantities. The
-server rejects empty, duplicate, malformed, unavailable, inactive, or excessive
-cart lines. It resolves active variants and products from Supabase, converts the
-catalog retail prices to cents, and creates the pending order and immutable item
+The browser first submits storefront variant IDs, quantities, and a normalized
+US address to `/api/shipping/quote`. The server resolves the active catalog rows
+and asks Printful for live shipping methods using each item's catalog variant
+ID. At checkout, the browser sends only those cart identifiers, the address, and
+the selected method ID. It never supplies a product price, shipping price, or
+order total.
+
+The Checkout route resolves the catalog again and obtains a fresh Printful quote
+for the same address and cart. It requires an exact selected-method match, uses
+the newly quoted amount as the authoritative shipping charge, and rejects a
+method that disappeared. It then creates the pending order and immutable item
 snapshots before requesting a Stripe Checkout Session.
 
-Sessions use inline `price_data`, `mode=payment`, the Supabase order UUID as the
-client reference, an order-derived idempotency key, and minimal order identifier
-metadata. Stripe collects the shipping address only for the countries configured
-by `CHECKOUT_ALLOWED_COUNTRIES`. No shipping or tax amount is charged yet.
+Sessions use inline product `price_data`, one inline fixed-amount shipping rate,
+`mode=payment`, the Supabase order UUID as the client reference, an order-derived
+idempotency key, and minimal order identifier metadata. The address is collected
+and normalized by the storefront before redirecting to Stripe; Stripe does not
+collect a second shipping address. The authoritative Printful shipping amount is
+charged. Tax remains zero in this phase.
 If Stripe Session creation fails after persistence, the order remains accurately
 unpaid and `checkout_pending`; it is never marked paid by the request route.
 
-Do not enable live Stripe keys until real Printful shipping rates and tax behavior
-have been implemented, tested, and reviewed. The server-side Stripe client keeps
-rejecting live secret keys during this phase.
+Do not enable live Stripe keys until tax behavior has been implemented, tested,
+and reviewed. The server-side Stripe client keeps rejecting live secret keys
+during this phase.
 
 ## Webhook processing
 
@@ -144,7 +154,7 @@ configured test Supabase project.
 4. Click checkout.
 5. Confirm that the Stripe-hosted page is in test mode.
 6. Enter card `4242 4242 4242 4242`, any future expiration date, any valid
-   three-digit CVC, and an allowed shipping address.
+   three-digit CVC.
 7. Complete Checkout.
 8. Confirm Stripe CLI receives `checkout.session.completed`.
 9. Confirm the webhook returns HTTP 200.
