@@ -126,5 +126,7 @@ the payment handler. Stripe webhook processing can therefore complete while the
 paid order remains available for an administrative retry.
 
 The selected Printful rate is revalidated and charged through Stripe before the
-order is created. Tax remains zero. Taxes, live payments, and automatic Printful
-confirmation remain future work.
+order is created. Stripe Tax calculates customer-facing tax separately;
+Printful's fulfillment-side tax remains a merchant expense and is never copied
+to `orders.tax_cents`. Live payments and automatic Printful confirmation remain
+disabled.

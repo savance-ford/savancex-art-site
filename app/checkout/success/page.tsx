@@ -126,8 +126,35 @@ export default async function CheckoutSuccessPage({
                   <span>Payment status</span>
                   <strong>{state.order.payment_status}</strong>
                 </div>
+                <div className="summary-row">
+                  <span>Subtotal</span>
+                  <strong>
+                    {formatMoney(
+                      state.order.subtotal_cents / 100,
+                      state.order.currency.toUpperCase(),
+                    )}
+                  </strong>
+                </div>
+                <div className="summary-row">
+                  <span>Shipping</span>
+                  <strong>
+                    {formatMoney(
+                      state.order.shipping_cents / 100,
+                      state.order.currency.toUpperCase(),
+                    )}
+                  </strong>
+                </div>
+                <div className="summary-row">
+                  <span>Tax</span>
+                  <strong>
+                    {formatMoney(
+                      state.order.tax_cents / 100,
+                      state.order.currency.toUpperCase(),
+                    )}
+                  </strong>
+                </div>
                 <div className="summary-row summary-row--total">
-                  <span>Order total</span>
+                  <span>Total</span>
                   <strong>
                     {formatMoney(
                       state.order.total_cents / 100,

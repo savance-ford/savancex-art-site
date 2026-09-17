@@ -92,6 +92,12 @@ test("rejects empty carts, malformed lines, duplicate variants, and browser pric
       total: 1,
     },
     {
+      items: [{ variantId: "pf-1-2", quantity: 1 }],
+      shippingAddress,
+      shippingMethodId: "STANDARD",
+      tax_cents: 1,
+    },
+    {
       items: [
         { variantId: "pf-1-2", quantity: 1 },
         { variantId: "pf-1-2", quantity: 2 },

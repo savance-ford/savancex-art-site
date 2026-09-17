@@ -76,13 +76,14 @@ Sessions use inline product `price_data`, one inline fixed-amount shipping rate,
 idempotency key, and minimal order identifier metadata. The address is collected
 and normalized by the storefront before redirecting to Stripe; Stripe does not
 collect a second shipping address. The authoritative Printful shipping amount is
-charged. Tax remains zero in this phase.
+charged. Stripe Automatic Tax then calculates customer tax using the persisted
+Stripe Customer address.
 If Stripe Session creation fails after persistence, the order remains accurately
 unpaid and `checkout_pending`; it is never marked paid by the request route.
 
-Do not enable live Stripe keys until tax behavior has been implemented, tested,
-and reviewed. The server-side Stripe client keeps rejecting live secret keys
-during this phase.
+Do not enable live Stripe keys until Stripe Tax registrations and production tax
+behavior have been reviewed. The server-side Stripe client keeps rejecting live
+secret keys during this phase. See `docs/tax.md`.
 
 ## Webhook processing
 

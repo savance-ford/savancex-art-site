@@ -35,6 +35,12 @@ type PaidOrderDetails = {
   customerName?: string | null;
   customerPhone?: string | null;
   shippingAddress?: JsonValue | null;
+  taxCents: number;
+  totalCents: number;
+  stripeTaxStatus: string;
+  stripeTaxCalculationId?: string | null;
+  stripeTaxTransactionId?: string | null;
+  stripeTaxCollectedAt?: string;
   paidAt?: string;
 };
 
@@ -240,10 +246,54 @@ export async function attachStripeSession(
   return data;
 }
 
+export async function attachStripeCustomer(
+  orderId: string,
+  stripeCustomerId: string,
+): Promise<DatabaseOrder> {
+  const supabase = getSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("orders")
+    .update({ stripe_customer_id: stripeCustomerId })
+    .eq("id", orderId)
+    .eq("status", "checkout_pending")
+    .is("stripe_customer_id", null)
+    .select("*")
+    .maybeSingle();
+
+  if (error) {
+    throw new OrderRepositoryError("Unable to attach the Stripe Customer.");
+  }
+  if (data) return data;
+
+  const existingOrder = await getOrderById(orderId);
+  if (
+    existingOrder?.status === "checkout_pending" &&
+    existingOrder.stripe_customer_id === stripeCustomerId
+  ) {
+    return existingOrder;
+  }
+  throw new OrderRepositoryError("Unable to attach the Stripe Customer.");
+}
+
 export async function markOrderPaid(
   orderId: string,
   details: PaidOrderDetails,
 ): Promise<DatabaseOrder> {
+  assertSafeNonNegativeInteger(details.taxCents, "tax_cents");
+  assertSafeNonNegativeInteger(details.totalCents, "total_cents");
+  const existingOrder = await getOrderById(orderId);
+  if (!existingOrder) throw new OrderRepositoryError("The order no longer exists.");
+  if (
+    existingOrder.subtotal_cents +
+      existingOrder.shipping_cents +
+      details.taxCents !==
+    details.totalCents
+  ) {
+    throw new OrderValidationError(
+      "The verified Stripe total does not reconcile with the order amounts.",
+    );
+  }
+
   const { data, error } = await getSupabaseAdminClient()
     .from("orders")
     .update({
@@ -256,6 +306,13 @@ export async function markOrderPaid(
       customer_name: details.customerName,
       customer_phone: details.customerPhone,
       shipping_address: details.shippingAddress,
+      tax_cents: details.taxCents,
+      total_cents: details.totalCents,
+      stripe_tax_status: details.stripeTaxStatus,
+      stripe_tax_calculation_id: details.stripeTaxCalculationId,
+      stripe_tax_transaction_id: details.stripeTaxTransactionId,
+      stripe_tax_collected_at:
+        details.stripeTaxCollectedAt ?? new Date().toISOString(),
       paid_at: details.paidAt ?? new Date().toISOString(),
     })
     .eq("id", orderId)
@@ -268,8 +325,8 @@ export async function markOrderPaid(
   }
 
   if (!data) {
-    const existingOrder = await getOrderById(orderId);
-    if (existingOrder?.payment_status === "paid") return existingOrder;
+    const currentOrder = await getOrderById(orderId);
+    if (currentOrder?.payment_status === "paid") return currentOrder;
     throw new OrderRepositoryError("Unable to mark the order as paid.");
   }
 
@@ -305,6 +362,7 @@ export async function markOrderPaymentReview(
   orderId: string,
   stripeSessionId: string,
   stripePaymentIntentId: string | null,
+  stripeTaxStatus?: string | null,
 ): Promise<DatabaseOrder> {
   const { data, error } = await getSupabaseAdminClient()
     .from("orders")
@@ -313,6 +371,7 @@ export async function markOrderPaymentReview(
       payment_status: "processing",
       stripe_checkout_session_id: stripeSessionId,
       stripe_payment_intent_id: stripePaymentIntentId,
+      stripe_tax_status: stripeTaxStatus,
     })
     .eq("id", orderId)
     .neq("payment_status", "paid")

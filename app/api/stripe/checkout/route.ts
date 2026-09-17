@@ -1,9 +1,9 @@
-import type Stripe from "stripe";
 import { NextResponse } from "next/server";
 
 import {
   OrderRepositoryError,
   OrderValidationError,
+  attachStripeCustomer,
   attachStripeSession,
   createPendingOrder,
 } from "@/lib/orders/repository";
@@ -33,11 +33,14 @@ import {
   normalizedAddressToJson,
   ShippingAddressValidationError,
 } from "@/lib/shipping/address";
-import type { ShippingRate } from "@/lib/shipping/quote-types";
 import {
   selectShippingRate,
   SelectedShippingMethodUnavailableError,
 } from "@/lib/shipping/rates";
+import {
+  buildStripeCheckoutSessionParams,
+  getOrCreateStripeCustomerId,
+} from "@/lib/stripe/tax";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -55,20 +58,6 @@ function errorResponse(
     { error: message, ...(code ? { code } : {}) },
     { status, headers: RESPONSE_HEADERS },
   );
-}
-
-function stripeDeliveryEstimate(
-  rate: ShippingRate,
-): Stripe.Checkout.SessionCreateParams.ShippingOption.ShippingRateData.DeliveryEstimate | undefined {
-  if (!rate.minDeliveryDays && !rate.maxDeliveryDays) return undefined;
-  return {
-    ...(rate.minDeliveryDays
-      ? { minimum: { unit: "business_day" as const, value: rate.minDeliveryDays } }
-      : {}),
-    ...(rate.maxDeliveryDays
-      ? { maximum: { unit: "business_day" as const, value: rate.maxDeliveryDays } }
-      : {}),
-  };
 }
 
 async function readRequestBody(request: Request): Promise<unknown> {
@@ -151,46 +140,23 @@ export async function POST(request: Request): Promise<NextResponse> {
     });
     orderId = order.id;
 
-    const successUrl = `${new URL("/checkout/success", siteUrl).href}?session_id={CHECKOUT_SESSION_ID}`;
-    const cancelUrl = new URL("/cart?checkout=cancelled", siteUrl).href;
+    const stripeCustomerId = await getOrCreateStripeCustomerId({
+      existingCustomerId: order.stripe_customer_id,
+      address: checkoutRequest.shippingAddress,
+      orderId: order.id,
+      createCustomer: (params, options) =>
+        stripe.customers.create(params, options),
+    });
+    await attachStripeCustomer(order.id, stripeCustomerId);
+
     const session = await stripe.checkout.sessions.create(
-      {
-        mode: "payment",
-        client_reference_id: order.id,
-        metadata: {
-          order_id: order.id,
-          order_number: String(order.order_number),
-        },
-        customer_email: checkoutRequest.shippingAddress.email,
-        line_items: checkoutLines.map((line) => ({
-          quantity: line.request.quantity,
-          price_data: {
-            currency: "usd",
-            unit_amount: line.orderItem.unit_amount_cents,
-            product_data: {
-              name: line.stripeName,
-              description: line.stripeDescription,
-              images: line.stripeImageUrl ? [line.stripeImageUrl] : undefined,
-            },
-          },
-        })),
-        shipping_options: [
-          {
-            shipping_rate_data: {
-              type: "fixed_amount",
-              fixed_amount: {
-                amount: selectedShippingRate.amountCents,
-                currency: "usd",
-              },
-              display_name: selectedShippingRate.name,
-              delivery_estimate: stripeDeliveryEstimate(selectedShippingRate),
-              metadata: { printful_shipping_method_id: selectedShippingRate.id },
-            },
-          },
-        ],
-        success_url: successUrl,
-        cancel_url: cancelUrl,
-      },
+      buildStripeCheckoutSessionParams({
+        order,
+        lines: checkoutLines,
+        shippingRate: selectedShippingRate,
+        customerId: stripeCustomerId,
+        siteUrl,
+      }),
       { idempotencyKey: `checkout-session:${order.id}` },
     );
 

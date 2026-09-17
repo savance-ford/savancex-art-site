@@ -53,6 +53,10 @@ export type DatabaseOrder = {
   stripe_checkout_session_id: string | null;
   stripe_payment_intent_id: string | null;
   stripe_customer_id: string | null;
+  stripe_tax_status: string | null;
+  stripe_tax_calculation_id: string | null;
+  stripe_tax_transaction_id: string | null;
+  stripe_tax_collected_at: string | null;
   customer_email: string | null;
   customer_name: string | null;
   customer_phone: string | null;
