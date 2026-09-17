@@ -20,9 +20,16 @@ const order: DatabaseOrder = {
   fulfillment_status: "not_started",
   currency: "usd",
   subtotal_cents: 6800,
-  shipping_cents: 0,
+  shipping_cents: 495,
+  shipping_method_id: "EXPRESS",
+  shipping_method_name: "Express",
+  shipping_min_delivery_days: 2,
+  shipping_max_delivery_days: 3,
+  shipping_min_delivery_date: "2026-09-19",
+  shipping_max_delivery_date: "2026-09-20",
+  shipping_rate_quoted_at: "2026-09-16T19:58:00.000Z",
   tax_cents: 0,
-  total_cents: 6800,
+  total_cents: 7295,
   stripe_checkout_session_id: "cs_test_example",
   stripe_payment_intent_id: "pi_example",
   stripe_customer_id: "cus_example",
@@ -31,12 +38,14 @@ const order: DatabaseOrder = {
   customer_phone: "+14155550123",
   shipping_address: {
     name: "Ada Lovelace",
-    address_line_1: "123 Main St",
-    address_line_2: "Apt 4",
+    email: "buyer@example.com",
+    phone: "+14155550123",
+    addressLine1: "4708 Creekwood Lane",
+    addressLine2: "308",
     city: "Madison",
-    state: "wi",
-    postal_code: "53703",
-    country: "us",
+    stateCode: "WI",
+    postalCode: "53704",
+    countryCode: "US",
   },
   printful_order_id: null,
   printful_external_id: null,
@@ -75,17 +84,17 @@ const item: DatabaseOrderItem = {
 test("maps verified order data to a stable Printful draft payload", () => {
   expect(buildPrintfulDraftOrderPayload(order, [item])).toEqual({
     external_id: "11111111111141118111111111111111",
-    shipping: "STANDARD",
+    shipping: "EXPRESS",
     recipient: {
       name: "Ada Lovelace",
       email: "buyer@example.com",
       phone: "+14155550123",
-      address1: "123 Main St",
-      address2: "Apt 4",
+      address1: "4708 Creekwood Lane",
+      address2: "308",
       city: "Madison",
       state_code: "WI",
       country_code: "US",
-      zip: "53703",
+      zip: "53704",
     },
     items: [
       {
@@ -95,6 +104,9 @@ test("maps verified order data to a stable Printful draft payload", () => {
       },
     ],
   });
+  expect(
+    JSON.stringify(buildPrintfulDraftOrderPayload(order, [item])),
+  ).not.toContain("4708 Creekwood Lane, Madison, WI 53704, 308");
 });
 
 test("normalizes UUID external IDs to stable 32-character lowercase hex", () => {
@@ -121,6 +133,32 @@ test("rejects missing shipping fields without fabricating recipient data", () =>
       [item],
     ),
   ).toThrow(PrintfulFulfillmentValidationError);
+});
+
+test("uses STANDARD only for legacy orders that predate shipping quotes", () => {
+  const legacyOrder = {
+    ...order,
+    shipping_method_id: null,
+    shipping_method_name: null,
+    shipping_min_delivery_days: null,
+    shipping_max_delivery_days: null,
+    shipping_min_delivery_date: null,
+    shipping_max_delivery_date: null,
+    shipping_rate_quoted_at: null,
+  };
+
+  expect(buildPrintfulDraftOrderPayload(legacyOrder, [item]).shipping).toBe(
+    "STANDARD",
+  );
+});
+
+test("rejects quoted orders that lost their selected shipping method", () => {
+  expect(() =>
+    buildPrintfulDraftOrderPayload(
+      { ...order, shipping_method_id: null },
+      [item],
+    ),
+  ).toThrow("missing its selected Printful shipping method");
 });
 
 test("rejects order items without a valid Printful Sync Variant ID", () => {

@@ -7,6 +7,10 @@ import type {
   JsonValue,
   OrderWithItems,
 } from "@/lib/orders/types";
+import {
+  normalizedAddressToJson,
+  normalizeShippingAddress,
+} from "@/lib/shipping/address";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 
 export class OrderRepositoryError extends Error {
@@ -112,6 +116,12 @@ export async function createPendingOrder(
   input: CreateOrderInput,
 ): Promise<OrderWithItems> {
   validateCreateOrderInput(input);
+  const shippingAddress =
+    input.shipping_address === undefined || input.shipping_address === null
+      ? input.shipping_address
+      : normalizedAddressToJson(
+          normalizeShippingAddress(input.shipping_address),
+        );
 
   const supabase = getSupabaseAdminClient();
   const { data: order, error: orderError } = await supabase
@@ -120,6 +130,17 @@ export async function createPendingOrder(
       currency: input.currency ?? "usd",
       subtotal_cents: input.subtotal_cents,
       shipping_cents: input.shipping_cents ?? 0,
+      shipping_address: shippingAddress,
+      shipping_method_id: input.shipping_method_id,
+      shipping_method_name: input.shipping_method_name,
+      shipping_min_delivery_days: input.shipping_min_delivery_days,
+      shipping_max_delivery_days: input.shipping_max_delivery_days,
+      shipping_min_delivery_date: input.shipping_min_delivery_date,
+      shipping_max_delivery_date: input.shipping_max_delivery_date,
+      shipping_rate_quoted_at: input.shipping_rate_quoted_at,
+      customer_email: input.customer_email,
+      customer_name: input.customer_name,
+      customer_phone: input.customer_phone,
       tax_cents: input.tax_cents ?? 0,
       total_cents: input.total_cents,
     })

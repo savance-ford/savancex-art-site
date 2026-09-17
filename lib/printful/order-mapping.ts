@@ -3,6 +3,10 @@ import type {
   DatabaseOrderItem,
   JsonValue,
 } from "@/lib/orders/types";
+import {
+  normalizeShippingAddress,
+  type NormalizedShippingAddress,
+} from "@/lib/shipping/address";
 
 type JsonRecord = { [key: string]: JsonValue | undefined };
 const UUID_PATTERN =
@@ -22,7 +26,7 @@ export type PrintfulRecipient = {
 
 export type PrintfulDraftOrderPayload = {
   external_id: string;
-  shipping: "STANDARD";
+  shipping: string;
   recipient: PrintfulRecipient;
   items: Array<{
     external_id: string;
@@ -40,18 +44,6 @@ export class PrintfulFulfillmentValidationError extends Error {
 
 function isJsonRecord(value: JsonValue | null): value is JsonRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function requiredString(record: JsonRecord, key: string, label: string): string {
-  const value = record[key];
-  if (typeof value !== "string" || !value.trim()) {
-    throw new PrintfulFulfillmentValidationError(`${label} is missing.`);
-  }
-  return value.trim();
-}
-
-function optionalString(value: unknown): string | undefined {
-  return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
 function getUuidExternalId(value: string, label: string): string {
@@ -85,50 +77,56 @@ export function mapPrintfulRecipient(order: DatabaseOrder): PrintfulRecipient {
   }
 
   const address = order.shipping_address;
-  const countryCode = requiredString(
-    address,
-    "country",
-    "Shipping country code",
-  ).toUpperCase();
-  const stateCode = requiredString(
-    address,
-    "state",
-    "Shipping state code",
-  ).toUpperCase();
-
-  if (!/^[A-Z]{2}$/.test(countryCode)) {
-    throw new PrintfulFulfillmentValidationError(
-      "Shipping country code must use a two-letter code.",
+  let normalized: NormalizedShippingAddress;
+  try {
+    const usesCurrentShape = "addressLine1" in address;
+    normalized = normalizeShippingAddress(
+      usesCurrentShape
+        ? {
+            ...address,
+            email: address.email ?? order.customer_email,
+            phone: address.phone ?? order.customer_phone,
+          }
+        : {
+            name: address.name ?? order.customer_name,
+            email: order.customer_email,
+            phone: order.customer_phone,
+            addressLine1: address.address_line_1,
+            addressLine2: address.address_line_2,
+            city: address.city,
+            stateCode: address.state,
+            postalCode: address.postal_code,
+            countryCode: address.country,
+          },
     );
-  }
-
-  if (countryCode === "US" && !/^[A-Z]{2}$/.test(stateCode)) {
+  } catch {
     throw new PrintfulFulfillmentValidationError(
-      "US shipping state code must use a two-letter code.",
+      "The paid order has no valid shipping address.",
     );
   }
 
   return {
-    name: requiredString(address, "name", "Shipping recipient name"),
-    ...(optionalString(order.customer_email)
-      ? { email: optionalString(order.customer_email) }
-      : {}),
-    ...(optionalString(order.customer_phone)
-      ? { phone: optionalString(order.customer_phone) }
-      : {}),
-    address1: requiredString(
-      address,
-      "address_line_1",
-      "Shipping address line 1",
-    ),
-    ...(optionalString(address.address_line_2)
-      ? { address2: optionalString(address.address_line_2) }
-      : {}),
-    city: requiredString(address, "city", "Shipping city"),
-    state_code: stateCode,
-    country_code: countryCode,
-    zip: requiredString(address, "postal_code", "Shipping postal code"),
+    name: normalized.name,
+    email: normalized.email,
+    ...(normalized.phone ? { phone: normalized.phone } : {}),
+    address1: normalized.addressLine1,
+    ...(normalized.addressLine2 ? { address2: normalized.addressLine2 } : {}),
+    city: normalized.city,
+    state_code: normalized.stateCode,
+    country_code: normalized.countryCode,
+    zip: normalized.postalCode,
   };
+}
+
+function printfulShippingMethod(order: DatabaseOrder): string {
+  const method = order.shipping_method_id?.trim();
+  if (method && /^[A-Za-z0-9._:-]{1,128}$/.test(method)) return method;
+  if (order.shipping_rate_quoted_at) {
+    throw new PrintfulFulfillmentValidationError(
+      "The paid order is missing its selected Printful shipping method.",
+    );
+  }
+  return "STANDARD";
 }
 
 export function buildPrintfulDraftOrderPayload(
@@ -143,7 +141,7 @@ export function buildPrintfulDraftOrderPayload(
 
   return {
     external_id: getPrintfulExternalId(order.id),
-    shipping: "STANDARD",
+    shipping: printfulShippingMethod(order),
     recipient: mapPrintfulRecipient(order),
     items: items.map((item) => {
       if (

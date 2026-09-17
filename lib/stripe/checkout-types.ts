@@ -1,3 +1,9 @@
+import {
+  normalizeShippingAddress,
+  type NormalizedShippingAddress,
+  type ShippingAddressInput,
+} from "@/lib/shipping/address";
+
 export const MAX_CHECKOUT_LINES = 50;
 export const MAX_CHECKOUT_LINE_QUANTITY = 20;
 
@@ -11,6 +17,14 @@ export type CheckoutRequestLine = {
 
 export type CheckoutRequest = {
   items: CheckoutRequestLine[];
+  shippingAddress: ShippingAddressInput;
+  shippingMethodId: string;
+};
+
+export type ParsedCheckoutRequest = {
+  items: CheckoutRequestLine[];
+  shippingAddress: NormalizedShippingAddress;
+  shippingMethodId: string;
 };
 
 export type CheckoutResponse = {
@@ -20,6 +34,7 @@ export type CheckoutResponse = {
 
 export type CheckoutErrorResponse = {
   error: string;
+  code?: "shipping_method_unavailable";
 };
 
 export class CheckoutRequestValidationError extends TypeError {
@@ -41,23 +56,17 @@ function hasOnlyKeys(value: Record<string, unknown>, keys: string[]): boolean {
   );
 }
 
-export function parseCheckoutRequest(value: unknown): CheckoutRequest {
-  if (!isRecord(value) || !hasOnlyKeys(value, ["items"])) {
-    throw new CheckoutRequestValidationError(
-      "Checkout request must contain only an items array.",
-    );
-  }
-
-  if (!Array.isArray(value.items) || value.items.length === 0) {
+export function parseCheckoutLines(value: unknown): CheckoutRequestLine[] {
+  if (!Array.isArray(value) || value.length === 0) {
     throw new CheckoutRequestValidationError("Your cart is empty.");
   }
 
-  if (value.items.length > MAX_CHECKOUT_LINES) {
+  if (value.length > MAX_CHECKOUT_LINES) {
     throw new CheckoutRequestValidationError("Your cart has too many lines.");
   }
 
   const seenVariantIds = new Set<string>();
-  const items = value.items.map((candidate): CheckoutRequestLine => {
+  return value.map((candidate): CheckoutRequestLine => {
     if (
       !isRecord(candidate) ||
       !hasOnlyKeys(candidate, ["variantId", "quantity"])
@@ -97,6 +106,29 @@ export function parseCheckoutRequest(value: unknown): CheckoutRequest {
 
     return { variantId, quantity };
   });
+}
 
-  return { items };
+export function parseCheckoutRequest(value: unknown): ParsedCheckoutRequest {
+  if (
+    !isRecord(value) ||
+    !hasOnlyKeys(value, ["items", "shippingAddress", "shippingMethodId"])
+  ) {
+    throw new CheckoutRequestValidationError(
+      "Checkout request contains unsupported fields.",
+    );
+  }
+
+  const shippingMethodId = value.shippingMethodId;
+  if (
+    typeof shippingMethodId !== "string" ||
+    !/^[A-Za-z0-9._:-]{1,128}$/.test(shippingMethodId)
+  ) {
+    throw new CheckoutRequestValidationError("Select a valid shipping method.");
+  }
+
+  return {
+    items: parseCheckoutLines(value.items),
+    shippingAddress: normalizeShippingAddress(value.shippingAddress),
+    shippingMethodId,
+  };
 }

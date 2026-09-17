@@ -1,3 +1,4 @@
+import type Stripe from "stripe";
 import { NextResponse } from "next/server";
 
 import {
@@ -20,18 +21,54 @@ import {
 } from "@/lib/stripe/checkout-types";
 import { getStripeClient } from "@/lib/stripe/client";
 import { StripeConfigurationError } from "@/lib/stripe/errors";
+import {
+  PrintfulApiError,
+  PrintfulConfigurationError,
+} from "@/lib/printful/errors";
+import {
+  getPrintfulShippingRates,
+  PrintfulShippingValidationError,
+} from "@/lib/printful/shipping";
+import {
+  normalizedAddressToJson,
+  ShippingAddressValidationError,
+} from "@/lib/shipping/address";
+import type { ShippingRate } from "@/lib/shipping/quote-types";
+import {
+  selectShippingRate,
+  SelectedShippingMethodUnavailableError,
+} from "@/lib/shipping/rates";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 20;
 
 const MAX_REQUEST_BYTES = 16_384;
 const RESPONSE_HEADERS = { "Cache-Control": "no-store" } as const;
 
-function errorResponse(message: string, status: number) {
+function errorResponse(
+  message: string,
+  status: number,
+  code?: CheckoutErrorResponse["code"],
+) {
   return NextResponse.json<CheckoutErrorResponse>(
-    { error: message },
+    { error: message, ...(code ? { code } : {}) },
     { status, headers: RESPONSE_HEADERS },
   );
+}
+
+function stripeDeliveryEstimate(
+  rate: ShippingRate,
+): Stripe.Checkout.SessionCreateParams.ShippingOption.ShippingRateData.DeliveryEstimate | undefined {
+  if (!rate.minDeliveryDays && !rate.maxDeliveryDays) return undefined;
+  return {
+    ...(rate.minDeliveryDays
+      ? { minimum: { unit: "business_day" as const, value: rate.minDeliveryDays } }
+      : {}),
+    ...(rate.maxDeliveryDays
+      ? { maximum: { unit: "business_day" as const, value: rate.maxDeliveryDays } }
+      : {}),
+  };
 }
 
 async function readRequestBody(request: Request): Promise<unknown> {
@@ -64,6 +101,13 @@ export async function POST(request: Request): Promise<NextResponse> {
     const checkoutLines = await resolveAuthoritativeCheckoutLines(
       checkoutRequest.items,
     );
+    const selectedShippingRate = selectShippingRate(
+      await getPrintfulShippingRates(
+        checkoutRequest.shippingAddress,
+        checkoutLines,
+      ),
+      checkoutRequest.shippingMethodId,
+    );
     const subtotalCents = checkoutLines.reduce(
       (total, line) => total + line.orderItem.line_total_cents,
       0,
@@ -75,14 +119,34 @@ export async function POST(request: Request): Promise<NextResponse> {
       );
     }
 
-    const { siteUrl, allowedCountries } = getCheckoutConfiguration();
+    const totalCents = subtotalCents + selectedShippingRate.amountCents;
+    if (!Number.isSafeInteger(totalCents)) {
+      throw new CheckoutCatalogUnavailableError(
+        "The order total exceeds the supported range.",
+      );
+    }
+
+    const { siteUrl } = getCheckoutConfiguration();
     const stripe = getStripeClient();
     const order = await createPendingOrder({
       currency: "usd",
       subtotal_cents: subtotalCents,
-      shipping_cents: 0,
+      shipping_cents: selectedShippingRate.amountCents,
+      shipping_address: normalizedAddressToJson(
+        checkoutRequest.shippingAddress,
+      ),
+      shipping_method_id: selectedShippingRate.id,
+      shipping_method_name: selectedShippingRate.name,
+      shipping_min_delivery_days: selectedShippingRate.minDeliveryDays,
+      shipping_max_delivery_days: selectedShippingRate.maxDeliveryDays,
+      shipping_min_delivery_date: selectedShippingRate.minDeliveryDate,
+      shipping_max_delivery_date: selectedShippingRate.maxDeliveryDate,
+      shipping_rate_quoted_at: new Date().toISOString(),
+      customer_email: checkoutRequest.shippingAddress.email,
+      customer_name: checkoutRequest.shippingAddress.name,
+      customer_phone: checkoutRequest.shippingAddress.phone ?? null,
       tax_cents: 0,
-      total_cents: subtotalCents,
+      total_cents: totalCents,
       items: checkoutLines.map((line) => line.orderItem),
     });
     orderId = order.id;
@@ -97,6 +161,7 @@ export async function POST(request: Request): Promise<NextResponse> {
           order_id: order.id,
           order_number: String(order.order_number),
         },
+        customer_email: checkoutRequest.shippingAddress.email,
         line_items: checkoutLines.map((line) => ({
           quantity: line.request.quantity,
           price_data: {
@@ -109,9 +174,20 @@ export async function POST(request: Request): Promise<NextResponse> {
             },
           },
         })),
-        shipping_address_collection: {
-          allowed_countries: allowedCountries,
-        },
+        shipping_options: [
+          {
+            shipping_rate_data: {
+              type: "fixed_amount",
+              fixed_amount: {
+                amount: selectedShippingRate.amountCents,
+                currency: "usd",
+              },
+              display_name: selectedShippingRate.name,
+              delivery_estimate: stripeDeliveryEstimate(selectedShippingRate),
+              metadata: { printful_shipping_method_id: selectedShippingRate.id },
+            },
+          },
+        ],
         success_url: successUrl,
         cancel_url: cancelUrl,
       },
@@ -133,12 +209,31 @@ export async function POST(request: Request): Promise<NextResponse> {
       return errorResponse(error.message, 400);
     }
 
+    if (error instanceof ShippingAddressValidationError) {
+      return errorResponse(error.message, 400);
+    }
+
+    if (error instanceof SelectedShippingMethodUnavailableError) {
+      return errorResponse(error.message, 409, "shipping_method_unavailable");
+    }
+
     if (error instanceof CheckoutCatalogValidationError) {
       return errorResponse(error.message, 400);
     }
 
     if (error instanceof CheckoutCatalogUnavailableError) {
       return errorResponse(error.message, 503);
+    }
+
+    if (error instanceof PrintfulShippingValidationError) {
+      return errorResponse(error.message, 422);
+    }
+
+    if (
+      error instanceof PrintfulApiError ||
+      error instanceof PrintfulConfigurationError
+    ) {
+      return errorResponse("Shipping rates are temporarily unavailable.", 503);
     }
 
     if (
