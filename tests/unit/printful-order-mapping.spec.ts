@@ -6,6 +6,9 @@ import type {
 } from "@/lib/orders/types";
 import {
   buildPrintfulDraftOrderPayload,
+  getPrintfulExternalId,
+  getPrintfulOrderItemExternalId,
+  isLegacyPrintfulExternalId,
   PrintfulFulfillmentValidationError,
 } from "@/lib/printful/order-mapping";
 
@@ -71,7 +74,7 @@ const item: DatabaseOrderItem = {
 
 test("maps verified order data to a stable Printful draft payload", () => {
   expect(buildPrintfulDraftOrderPayload(order, [item])).toEqual({
-    external_id: `savancex-${order.id}`,
+    external_id: "11111111111141118111111111111111",
     shipping: "STANDARD",
     recipient: {
       name: "Ada Lovelace",
@@ -86,12 +89,29 @@ test("maps verified order data to a stable Printful draft payload", () => {
     },
     items: [
       {
-        external_id: item.id,
+        external_id: "22222222222242228222222222222222",
         sync_variant_id: 200,
         quantity: 2,
       },
     ],
   });
+});
+
+test("normalizes UUID external IDs to stable 32-character lowercase hex", () => {
+  const mixedCaseUuid = "904F9BBC-84B9-430E-9C07-E7E1ABC3A5A5";
+  const expected = "904f9bbc84b9430e9c07e7e1abc3a5a5";
+
+  expect(getPrintfulExternalId(mixedCaseUuid)).toBe(expected);
+  expect(getPrintfulOrderItemExternalId(mixedCaseUuid)).toBe(expected);
+  expect(expected).toHaveLength(32);
+  expect(expected).toMatch(/^[0-9a-f]{32}$/);
+});
+
+test("recognizes only the exact legacy prefixed order external ID", () => {
+  expect(isLegacyPrintfulExternalId(order.id, `savancex-${order.id}`)).toBe(
+    true,
+  );
+  expect(isLegacyPrintfulExternalId(order.id, order.id)).toBe(false);
 });
 
 test("rejects missing shipping fields without fabricating recipient data", () => {

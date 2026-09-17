@@ -9,6 +9,7 @@ import {
   buildPrintfulDraftOrderPayload,
   getPrintfulExternalId,
   hasValidPrintfulRecipient,
+  isLegacyPrintfulExternalId,
   PrintfulFulfillmentValidationError,
 } from "@/lib/printful/order-mapping";
 import { printfulRequest } from "@/lib/printful/client";
@@ -189,6 +190,18 @@ function hasValidSyncVariants(items: readonly DatabaseOrderItem[]): boolean {
   );
 }
 
+function hasRetryCompatibleExternalId(
+  order: DatabaseOrder,
+  expectedExternalId: string,
+): boolean {
+  return (
+    !order.printful_external_id ||
+    order.printful_external_id === expectedExternalId ||
+    (order.fulfillment_status === "failed" &&
+      isLegacyPrintfulExternalId(order.id, order.printful_external_id))
+  );
+}
+
 export async function getPrintfulFulfillmentReadiness(
   orderId: string,
 ): Promise<PrintfulFulfillmentReadiness> {
@@ -210,8 +223,7 @@ export async function getPrintfulFulfillmentReadiness(
       canClaim(order) &&
       hasValidShippingRecipient &&
       allItemsHavePrintfulSyncVariantIds &&
-      (!order.printful_external_id ||
-        order.printful_external_id === expectedExternalId),
+      hasRetryCompatibleExternalId(order, expectedExternalId),
     orderId: order.id,
     paymentStatus: order.payment_status,
     orderStatus: order.status,
@@ -384,14 +396,17 @@ export async function createPrintfulDraftOrder(
   if (order.printful_order_id) return existingResult(order);
 
   if (
-    order.printful_external_id &&
-    order.printful_external_id !== externalId
+    !hasRetryCompatibleExternalId(order, externalId)
   ) {
     const error = new PrintfulFulfillmentError(
       "validation",
       "The order has a conflicting Printful external ID.",
     );
-    await recordFulfillmentFailure(order.id, externalId, error);
+    await recordFulfillmentFailure(
+      order.id,
+      order.printful_external_id ?? externalId,
+      error,
+    );
     throw error;
   }
 

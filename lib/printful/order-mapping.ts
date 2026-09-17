@@ -5,6 +5,8 @@ import type {
 } from "@/lib/orders/types";
 
 type JsonRecord = { [key: string]: JsonValue | undefined };
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export type PrintfulRecipient = {
   name: string;
@@ -52,8 +54,27 @@ function optionalString(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
+function getUuidExternalId(value: string, label: string): string {
+  if (!UUID_PATTERN.test(value)) {
+    throw new PrintfulFulfillmentValidationError(`${label} is not a valid UUID.`);
+  }
+
+  return value.replaceAll("-", "").toLowerCase();
+}
+
 export function getPrintfulExternalId(orderId: string): string {
-  return `savancex-${orderId}`;
+  return getUuidExternalId(orderId, "Order ID");
+}
+
+export function getPrintfulOrderItemExternalId(orderItemId: string): string {
+  return getUuidExternalId(orderItemId, "Order item ID");
+}
+
+export function isLegacyPrintfulExternalId(
+  orderId: string,
+  externalId: string,
+): boolean {
+  return externalId === `savancex-${orderId}`;
 }
 
 export function mapPrintfulRecipient(order: DatabaseOrder): PrintfulRecipient {
@@ -141,7 +162,7 @@ export function buildPrintfulDraftOrderPayload(
       }
 
       return {
-        external_id: item.id,
+        external_id: getPrintfulOrderItemExternalId(item.id),
         sync_variant_id: item.printful_sync_variant_id as number,
         quantity: item.quantity,
       };

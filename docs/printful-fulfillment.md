@@ -48,9 +48,15 @@ The existing server-only Printful client sends:
 POST https://api.printful.com/orders?update_existing=true
 ```
 
-The payload uses `shipping=STANDARD` and the deterministic external ID
-`savancex-{SUPABASE_ORDER_UUID}`. The same value is persisted in
-`orders.printful_external_id` and remains stable across retries.
+The payload uses `shipping=STANDARD`. Order and order-item external IDs are their
+respective lowercase Supabase UUIDs with hyphens removed. Each is exactly 32
+hexadecimal characters, remains stable across retries, and fits Printful's
+external-ID limit. The order value is persisted in
+`orders.printful_external_id`.
+
+A failed order that still contains the legacy `savancex-{SUPABASE_ORDER_UUID}`
+value is migrated to the corrected 32-character value during retry, before the
+Printful request. Rows that already have a `printful_order_id` are never changed.
 
 Before the API call, an atomic conditional update claims the order by setting
 `fulfillment_status=pending`. A current pending attempt blocks concurrent calls;
