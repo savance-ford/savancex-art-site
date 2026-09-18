@@ -104,13 +104,21 @@ test("checkout quotes shipping before starting Stripe and keeps the cart", async
 
   await page.getByLabel("Full name").fill("Test Customer");
   await page.getByLabel("Email").fill("customer@example.com");
-  await page.getByLabel("Street address").fill("4708 Creekwood Lane");
   await page
-    .getByLabel("Apartment, suite, unit, etc. (optional)")
-    .fill("308");
+    .getByLabel("Street address")
+    .fill("4708 Creekwood Lane, Madison, WI 53704, use rear entrance");
   await page.getByLabel("City").fill("Madison");
   await page.getByLabel("State").selectOption("WI");
   await page.getByLabel("ZIP code").fill("53704");
+  await page.getByRole("button", { name: "Get shipping methods" }).click();
+  await expect(page.locator("#checkout-address-1-error")).toContainText(
+    "Street address should contain only the street address",
+  );
+  expect(quoteRequest).toBeNull();
+
+  await page
+    .getByLabel("Street address")
+    .fill("4708 Creekwood Lane, Madison, WI 53704, 308");
   await page.getByRole("button", { name: "Get shipping methods" }).click();
   await expect(page.getByText("Flat Rate", { exact: true })).toBeVisible();
   await expect(page.getByText("$4.95", { exact: true })).toBeVisible();
@@ -127,6 +135,8 @@ test("checkout quotes shipping before starting Stripe and keeps the cart", async
       countryCode: "US",
     },
   });
+  await expect(page.getByLabel("Street address")).toHaveValue("4708 Creekwood Lane");
+  await expect(page.getByLabel("Apartment, suite, unit, etc. (optional)")).toHaveValue("308");
 
   await page.getByRole("button", { name: "Continue to payment" }).click();
   await expect(page).toHaveURL(/stripe_mock=1/);

@@ -80,6 +80,16 @@ const US_STATE_CODES = new Set<string>(US_STATES.map(([code]) => code));
 const ZIP_PATTERN = /^\d{5}(?:-\d{4})?$/;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+export const ADDRESS_LINE1_AUTOFILL_ERROR =
+  "Street address should contain only the street address. City, state, and ZIP are entered separately below.";
+
+export type AddressAutofillNormalization = {
+  addressLine1: string;
+  addressLine2: string;
+  repaired: boolean;
+  error: string | null;
+};
+
 export class ShippingAddressValidationError extends TypeError {
   constructor(message: string) {
     super(message);
@@ -111,7 +121,31 @@ function optionalText(
   return normalizeText(value, label, maxLength);
 }
 
-function separateLegacyCombinedAddressLine1({
+function literalPattern(value: string): string {
+  return value
+    .trim()
+    .split(/\s+/)
+    .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .join("\\s+");
+}
+
+function normalizedComparison(value: string): string {
+  return value.trim().replace(/\s+/g, " ").toLocaleLowerCase("en-US");
+}
+
+function isUnambiguousUnit(value: string): boolean {
+  const explicitUnit =
+    /^(?:apt(?:artment)?|suite|ste|unit|room|rm|floor|fl|building|bldg|lot|dept)\.?\s*#?\s*[a-z0-9][a-z0-9 ./#'-]{0,24}$/i;
+  const compactUnit = /^(?:#\s*)?(?=[a-z0-9/-]*\d)[a-z0-9]{1,10}(?:[-/][a-z0-9]{1,10})?$/i;
+  return explicitUnit.test(value) || compactUnit.test(value);
+}
+
+/**
+ * Repairs one known browser-autofill failure without parsing a free-form address.
+ * A change is made only when line 1 contains an exact city/state/ZIP suffix that
+ * duplicates the separately supplied structured fields.
+ */
+export function normalizeAddressAutofill({
   addressLine1,
   addressLine2,
   city,
@@ -123,39 +157,62 @@ function separateLegacyCombinedAddressLine1({
   city: string;
   stateCode: string;
   postalCode: string;
-}): string {
-  const normalizedLine1 = addressLine1.toLocaleLowerCase("en-US");
-  const localitySuffixes = [
-    `, ${city}, ${stateCode} ${postalCode}`,
-    `, ${city}, ${stateCode}, ${postalCode}`,
-  ];
-
-  for (const localitySuffix of localitySuffixes) {
-    const suffixIndex = normalizedLine1.lastIndexOf(
-      localitySuffix.toLocaleLowerCase("en-US"),
-    );
-    if (suffixIndex < 1) continue;
-
-    const streetAddress = addressLine1.slice(0, suffixIndex).trim();
-    const trailingValue = addressLine1
-      .slice(suffixIndex + localitySuffix.length)
-      .trim();
-    const expectedLine2 = addressLine2 ? `, ${addressLine2}` : "";
-
-    if (
-      streetAddress &&
-      trailingValue.toLocaleLowerCase("en-US") ===
-        expectedLine2.toLocaleLowerCase("en-US")
-    ) {
-      return streetAddress;
-    }
-
-    throw new ShippingAddressValidationError(
-      "Street address duplicates the city, state, or ZIP code. Re-enter the street and apartment/unit in their separate fields.",
-    );
+}): AddressAutofillNormalization {
+  const unchanged = {
+    addressLine1,
+    addressLine2: addressLine2 ?? "",
+    repaired: false,
+    error: null,
+  };
+  const state = US_STATES.find(([code]) => code === stateCode.trim().toUpperCase());
+  if (!addressLine1.trim() || !city.trim() || !state || !postalCode.trim()) {
+    return unchanged;
   }
 
-  return addressLine1;
+  const stateRepresentations = [state[0], state[1]]
+    .map(literalPattern)
+    .join("|");
+  const duplicatedSuffix = new RegExp(
+    `^(?<street>.+),\\s*${literalPattern(city)}\\s*,\\s*(?:${stateRepresentations})(?:\\s+|\\s*,\\s*)${literalPattern(postalCode)}(?:\\s*,\\s*(?<unit>.*))?$`,
+    "i",
+  );
+  const match = duplicatedSuffix.exec(addressLine1.trim());
+  if (!match?.groups) return unchanged;
+
+  const streetAddress = match.groups.street?.trim() ?? "";
+  const trailingUnit = match.groups.unit;
+  const existingLine2 = addressLine2?.trim() ?? "";
+  if (!streetAddress) {
+    return { ...unchanged, error: ADDRESS_LINE1_AUTOFILL_ERROR };
+  }
+
+  if (trailingUnit === undefined) {
+    return {
+      addressLine1: streetAddress,
+      addressLine2: existingLine2,
+      repaired: true,
+      error: null,
+    };
+  }
+
+  const unit = trailingUnit.trim().replace(/\s+/g, " ");
+  const matchesExistingLine2 =
+    existingLine2 &&
+    normalizedComparison(existingLine2) === normalizedComparison(unit);
+  if (
+    !unit ||
+    (existingLine2 && !matchesExistingLine2) ||
+    (!existingLine2 && !isUnambiguousUnit(unit))
+  ) {
+    return { ...unchanged, error: ADDRESS_LINE1_AUTOFILL_ERROR };
+  }
+
+  return {
+    addressLine1: streetAddress,
+    addressLine2: existingLine2 || unit,
+    repaired: true,
+    error: null,
+  };
 }
 
 export function normalizeShippingAddress(value: unknown): NormalizedShippingAddress {
@@ -199,19 +256,28 @@ export function normalizeShippingAddress(value: unknown): NormalizedShippingAddr
   }
 
   const phone = optionalText(value.phone, "Phone", 30);
-  const addressLine2 = optionalText(
+  const suppliedAddressLine2 = optionalText(
     value.addressLine2,
     "Apartment, suite, or unit",
     200,
   );
   const city = normalizeText(value.city, "City", 100);
-  const addressLine1 = separateLegacyCombinedAddressLine1({
+  const autofillNormalization = normalizeAddressAutofill({
     addressLine1: normalizeText(value.addressLine1, "Street address", 200),
-    ...(addressLine2 ? { addressLine2 } : {}),
+    addressLine2: suppliedAddressLine2 ?? "",
     city,
     stateCode,
     postalCode,
   });
+  if (autofillNormalization.error) {
+    throw new ShippingAddressValidationError(autofillNormalization.error);
+  }
+  const addressLine1 = autofillNormalization.addressLine1;
+  const addressLine2 = optionalText(
+    autofillNormalization.addressLine2,
+    "Apartment, suite, or unit",
+    200,
+  );
 
   return {
     name: normalizeText(value.name, "Full name", 100),

@@ -1,6 +1,8 @@
 import { expect, test } from "@playwright/test";
 
 import {
+  ADDRESS_LINE1_AUTOFILL_ERROR,
+  normalizeAddressAutofill,
   normalizeShippingAddress,
   normalizedAddressToJson,
   preserveExistingShippingAddress,
@@ -73,20 +75,54 @@ test("keeps the Creekwood street and unit separate through both API contracts", 
 });
 
 test("safely migrates only an exact combined address with known separate fields", () => {
+  const autofilledAddress = {
+    name: "Test Customer",
+    email: "customer@example.com",
+    addressLine1: "4708 Creekwood Lane, Madison, WI 53704, 308",
+    addressLine2: "",
+    city: "Madison",
+    stateCode: "WI",
+    postalCode: "53704",
+    countryCode: "US",
+  };
+  const repairedAddress = {
+    addressLine1: "4708 Creekwood Lane",
+    addressLine2: "308",
+    city: "Madison",
+    stateCode: "WI",
+    postalCode: "53704",
+  };
+
+  expect(normalizeShippingAddress(autofilledAddress)).toMatchObject(repairedAddress);
   expect(
-    normalizeShippingAddress({
-      name: "Test Customer",
-      email: "customer@example.com",
-      addressLine1: "4708 Creekwood Lane, Madison, WI 53704, 308",
-      addressLine2: "308",
+    parseShippingQuoteRequest({
+      items: [{ variantId: "pf-1-2", quantity: 1 }],
+      address: autofilledAddress,
+    }).address,
+  ).toMatchObject(repairedAddress);
+  expect(
+    parseCheckoutRequest({
+      items: [{ variantId: "pf-1-2", quantity: 1 }],
+      shippingAddress: autofilledAddress,
+      shippingMethodId: "STANDARD",
+    }).shippingAddress,
+  ).toMatchObject(repairedAddress);
+});
+
+test("recognizes the selected state's full name as the same structured suffix", () => {
+  expect(
+    normalizeAddressAutofill({
+      addressLine1: "4708 Creekwood Lane, Madison, Wisconsin 53704, 308",
+      addressLine2: "",
       city: "Madison",
       stateCode: "WI",
       postalCode: "53704",
-      countryCode: "US",
     }),
-  ).toMatchObject({
+  ).toEqual({
     addressLine1: "4708 Creekwood Lane",
     addressLine2: "308",
+    repaired: true,
+    error: null,
   });
 });
 
@@ -95,22 +131,31 @@ test("rejects an ambiguous combined address instead of parsing an unknown unit",
     normalizeShippingAddress({
       name: "Test Customer",
       email: "customer@example.com",
-      addressLine1: "4708 Creekwood Lane, Madison, WI 53704, 308",
+      addressLine1: "4708 Creekwood Lane, Madison, WI 53704, use rear entrance",
       city: "Madison",
       stateCode: "WI",
       postalCode: "53704",
       countryCode: "US",
     }),
-  ).toThrow("Re-enter the street and apartment/unit in their separate fields");
+  ).toThrow(ADDRESS_LINE1_AUTOFILL_ERROR);
 });
 
 test("preserves legitimate comma-containing street addresses", () => {
+  const commaAddress = "Building A, 4708 Creekwood Lane";
   expect(
-    normalizeShippingAddress({
-      ...address,
-      addressLine1: "Building A, 4708 Creekwood Lane",
-    }).addressLine1,
-  ).toBe("Building A, 4708 Creekwood Lane");
+    normalizeAddressAutofill({
+      addressLine1: commaAddress,
+      addressLine2: "",
+      city: "Madison",
+      stateCode: "WI",
+      postalCode: "53704",
+    }),
+  ).toEqual({
+    addressLine1: commaAddress,
+    addressLine2: "",
+    repaired: false,
+    error: null,
+  });
 });
 
 test("accepts only five-digit or ZIP+4 US postal codes", () => {
