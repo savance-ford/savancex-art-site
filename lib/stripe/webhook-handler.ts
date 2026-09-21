@@ -25,6 +25,7 @@ import {
   StripeOrderResolutionError,
   resolveOrderForCheckoutSession,
 } from "@/lib/stripe/session-orders";
+import { reconcileStripeCheckoutTax } from "@/lib/stripe/tax";
 
 export const SUPPORTED_CHECKOUT_EVENT_TYPES = new Set([
   "checkout.session.completed",
@@ -128,11 +129,17 @@ async function processSuccessfulSession(
     );
   }
 
-  const currencyMatches =
-    session.currency?.toLowerCase() === order.currency.toLowerCase();
-  const amountMatches = session.amount_total === order.total_cents;
-  if (!currencyMatches || !amountMatches) {
-    await markOrderPaymentReview(order.id, session.id, paymentIntentId);
+  const taxReconciliation = reconcileStripeCheckoutTax(session, order);
+  if (!taxReconciliation.amountsReconciled) {
+    await markOrderPaymentReview(
+      order.id,
+      session.id,
+      paymentIntentId,
+      taxReconciliation.automaticTaxStatus,
+    );
+    console.error(
+      `Stripe Tax reconciliation requires review for order ${order.id} (status: ${taxReconciliation.automaticTaxStatus ?? "missing"}).`,
+    );
     return "payment_review";
   }
 
@@ -161,7 +168,8 @@ async function processSuccessfulSession(
   const paidOrder = await markOrderPaid(order.id, {
     stripeCheckoutSessionId: session.id,
     stripePaymentIntentId: paymentIntentId,
-    stripeCustomerId: expandableId(session.customer),
+    stripeCustomerId:
+      expandableId(session.customer) ?? order.stripe_customer_id,
     customerEmail:
       nonEmpty(customerDetails?.email ?? session.customer_email) ??
       order.customer_email,
@@ -177,6 +185,12 @@ async function processSuccessfulSession(
       order.shipping_address,
       stripeShippingAddress,
     ) as JsonValue | null,
+    taxCents: taxReconciliation.taxCents,
+    totalCents: taxReconciliation.totalCents,
+    stripeTaxStatus: taxReconciliation.automaticTaxStatus,
+    stripeTaxCalculationId: null,
+    stripeTaxTransactionId: null,
+    stripeTaxCollectedAt: new Date().toISOString(),
     paidAt: new Date().toISOString(),
   });
   await attemptPrintfulDraft(paidOrder.id);

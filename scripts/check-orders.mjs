@@ -20,7 +20,7 @@ if (!supabaseUrl || !secretKey) {
     supabase
       .from("orders")
       .select(
-        "order_number,status,payment_status,total_cents,currency,created_at",
+        "order_number,status,payment_status,subtotal_cents,shipping_cents,tax_cents,total_cents,currency,stripe_tax_status,stripe_customer_id,created_at",
       )
       .order("created_at", { ascending: false })
       .limit(20),
@@ -51,8 +51,13 @@ if (!supabaseUrl || !secretKey) {
     console.log(`Generated: ${new Date().toISOString()}`);
     console.log(`Recent orders: ${orders.length}`);
     for (const order of orders) {
+      const amountsReconciled =
+        order.payment_status === "paid" &&
+        order.stripe_tax_status === "complete" &&
+        order.subtotal_cents + order.shipping_cents + order.tax_cents ===
+        order.total_cents;
       console.log(
-        `  #${order.order_number}: ${order.status}/${order.payment_status} ${order.total_cents} ${order.currency} (${order.created_at})`,
+        `  #${order.order_number}: ${order.status}/${order.payment_status} subtotal=${order.subtotal_cents} shipping=${order.shipping_cents} tax=${order.tax_cents} total=${order.total_cents} ${order.currency} stripeTaxStatus=${order.stripe_tax_status ?? "none"} stripeCustomerIdPresent=${Boolean(order.stripe_customer_id)} amountsReconciled=${amountsReconciled} (${order.created_at})`,
       );
     }
 

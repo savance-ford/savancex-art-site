@@ -33,6 +33,7 @@ export type DatabaseProduct = {
   printful_sync_product_id: number | null;
   printful_external_id: string | null;
   printful_thumbnail_url: string | null;
+  stripe_tax_code: string | null;
   metadata: Json;
   created_at: string;
   updated_at: string;
@@ -107,6 +108,7 @@ type DatabaseProductInsert = {
   printful_sync_product_id?: number | null;
   printful_external_id?: string | null;
   printful_thumbnail_url?: string | null;
+  stripe_tax_code?: string | null;
   metadata?: Json;
   created_at?: string;
   updated_at?: string;
@@ -186,6 +188,10 @@ type DatabaseOrderInsert = {
   stripe_checkout_session_id?: string | null;
   stripe_payment_intent_id?: string | null;
   stripe_customer_id?: string | null;
+  stripe_tax_status?: string | null;
+  stripe_tax_calculation_id?: string | null;
+  stripe_tax_transaction_id?: string | null;
+  stripe_tax_collected_at?: string | null;
   customer_email?: string | null;
   customer_name?: string | null;
   customer_phone?: string | null;

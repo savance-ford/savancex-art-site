@@ -38,7 +38,21 @@ export type AuthoritativeCheckoutLine = {
   stripeName: string;
   stripeDescription?: string;
   stripeImageUrl?: string;
+  stripeTaxCode?: string;
 };
+
+const STRIPE_TAX_CODE_PATTERN = /^txcd_[0-9]{8}$/;
+
+function productTaxCode(product: DatabaseProduct): string | undefined {
+  const taxCode = product.stripe_tax_code?.trim();
+  if (!taxCode) return undefined;
+  if (!STRIPE_TAX_CODE_PATTERN.test(taxCode)) {
+    throw new CheckoutCatalogUnavailableError(
+      "A catalog item has an invalid Stripe tax configuration.",
+    );
+  }
+  return taxCode;
+}
 
 function isUnavailableVariant(variant: DatabaseProductVariant): boolean {
   const status = variant.availability_status?.trim().toLowerCase();
@@ -238,6 +252,7 @@ export async function resolveAuthoritativeCheckoutLines(
       stripeName: product.name,
       stripeDescription: variantDescription(variant),
       stripeImageUrl: selectStripeProductImage(product, images),
+      stripeTaxCode: productTaxCode(product),
     };
   });
 }

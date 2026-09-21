@@ -58,5 +58,6 @@ and service-role-only table access remain in use.
 - Draft creation continues to use
   `POST /orders?update_existing=true`. It does not send `confirm=true` and never
   calls the confirm-order endpoint.
-- Stripe live keys are rejected, tax remains zero, and Printful drafts remain
-  unconfirmed for manual review.
+- Stripe live keys are rejected. Pre-payment tax starts at zero, then the
+  verified Stripe webhook persists the authoritative Automatic Tax amount.
+  Printful drafts remain unconfirmed for manual review.
